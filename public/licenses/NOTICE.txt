@@ -1,0 +1,10 @@
+This application includes React and React DOM (MIT), exifr (MIT), Mediabunny (MPL-2.0), and, when native AAC encoding is unavailable, @mediabunny/aac-encoder (MPL-2.0) with an FFmpeg AAC WebAssembly build (LGPL-2.1-or-later).
+Copies of license texts are in this directory. Dependencies are unmodified.
+Source and build instructions:
+https://github.com/facebook/react
+https://github.com/MikeKovarik/exifr
+https://github.com/Vanilagy/mediabunny/tree/v1.61.6
+https://github.com/Vanilagy/mediabunny/tree/v1.61.6/packages/aac-encoder
+https://github.com/FFmpeg/FFmpeg
+AAC extension installed version: 1.61.6; FFmpeg libavcodec version embedded by upstream: 62.23.103.
+The extension README includes the Emscripten/FFmpeg build recipe. Source for the extension is also included in its npm distribution. These source notices apply to the libraries, not to your selected photos or movies.
