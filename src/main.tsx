@@ -280,7 +280,7 @@ function App() {
             </p>
             {sorted.map((a) => (
               <article
-                className={`asset ${a.error ? "invalid" : ""}`}
+                className={`asset ${a.error ? "invalid" : a.date === null || !a.confirmed ? "needs-confirmation" : ""}`}
                 key={a.id}
               >
                 {a.thumbnail ? (
@@ -292,6 +292,9 @@ function App() {
                 )}
                 <div className="asset-info">
                   <strong>{a.file.name}</strong>
+                  {!a.error && (a.date === null || !a.confirmed) && (
+                    <p className="confirmation-alert">要確認：この素材の撮影日時を入力・確認してください</p>
+                  )}
                   {a.error ? (
                     <p role="alert">{a.error}</p>
                   ) : (
@@ -319,7 +322,7 @@ function App() {
                       </label>
                       {!a.confirmed && (
                         <button
-                          className="text-button"
+                          className="text-button confirmation-action"
                           disabled={busy || loading}
                           onClick={() => {
                             if (a.date !== null) {
@@ -359,9 +362,9 @@ function App() {
               </article>
             ))}
             {unresolved.length > 0 && (
-              <p className="notice">
+              <p className="notice confirmation-alert" role="alert">
                 {unresolved.length}
-                件の撮影日時を入力・確認してください。日時で順番を指定できます。
+                件の撮影日時が未確認です。赤い「要確認」の素材を確認してください。
               </p>
             )}
             {valid.length > 0 && unresolved.length === 0 && (

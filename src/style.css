@@ -522,3 +522,21 @@ input:focus-visible {
   background: white;
   color: inherit;
 }
+
+.needs-confirmation {
+  border-left: 3px solid #b42318;
+  padding-left: 10px;
+}
+.confirmation-alert,
+.text-button.confirmation-action {
+  color: #b42318;
+  font-weight: 600;
+}
+.asset-info .confirmation-alert {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0;
+}
+.notice.confirmation-alert {
+  background: #fff1f1;
+}
