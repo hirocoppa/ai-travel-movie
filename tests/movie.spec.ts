@@ -59,8 +59,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
   });
   await page.goto("/");
   await page.getByLabel("写真の表示時間（全体共通）").selectOption(String(photoDuration));
-  if (photoDuration !== 1.5)
-    await page.getByRole("checkbox", { name: "BGMを自動で付ける（無料）" }).uncheck();
+
   await page.locator("input[type=file]").setInputFiles([photo, video]);
   await page.getByLabel("photo.jpgの撮影日時").fill("2025-01-01T00:00");
   await page
@@ -108,7 +107,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
     r_frame_rate: "30/1",
   });
   expect(probe.streams[1].codec_name).toBe("aac");
-  // A uniform photo has no detected person and must stay still.
+  // Cover-fitted photos fill the output horizontally without black side bars.
   const photoWidthAt = (time: string) => {
     const row = execFileSync("ffmpeg", [
       "-v",
@@ -130,9 +129,10 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       if (row[i] > 120 && row[i + 1] > 20) width++;
     return width;
   };
-  expect(photoWidthAt("0.6")).toBe(photoWidthAt("0.4"));
+  expect(photoWidthAt("0.6")).toBe(1280);
+  expect(photoWidthAt("0.4")).toBe(1280);
 
-  // Decode the MP4: BGM follows the toggle and original video sound survives mixing.
+  // Decode the MP4: automatic BGM is audible and original video sound survives mixing.
   const raw = execFileSync("ffmpeg", [
     "-v",
     "error",
@@ -154,10 +154,8 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       samples.slice(from * 48000, to * 48000).reduce((s, x) => s + x * x, 0) /
         ((to - from) * 48000),
     );
-  if (photoDuration === 1.5) {
-    expect(rms(0.2, 0.7)).toBeGreaterThan(0.005);
-    await expect(page.locator(".result")).toContainText("あたたか");
-  } else expect(rms(0.2, 0.7)).toBeLessThan(0.001);
+  expect(rms(0.2, 0.7)).toBeGreaterThan(0.03);
+  await expect(page.locator(".result")).toContainText("BGM：あたたか");
   expect(rms(photoDuration + 1, photoDuration + 2)).toBeGreaterThan(0.01);
   // The source clip contains a 440 Hz tone; BGM alone must not satisfy this check.
   let real = 0, imaginary = 0;

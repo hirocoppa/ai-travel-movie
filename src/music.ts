@@ -85,7 +85,7 @@ export function mixBgm(
     let duck = 0;
     for (const region of nearby)
       duck = Math.max(duck, Math.max(0, Math.min(1, (t - region.start + 0.2) / 0.2, (region.end + 0.2 - t) / 0.2)));
-    const music = musicSample(t, mood) * 0.32 * (1 - 0.7 * duck) * fade;
+    const music = musicSample(t, mood) * 0.9 * (1 - 0.7 * duck) * fade;
     for (const channel of channels) {
       const mixed = channel[i] * 0.8 + music;
       // Smoothly limit only peaks; normal-level original sound remains linear.

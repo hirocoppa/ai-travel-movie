@@ -7,9 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run src",
     "preview": "vite preview --host 0.0.0.0",
-    "test:e2e": "playwright test",
-    "predev": "node scripts/prepare-assets.mjs",
-    "prebuild": "node scripts/prepare-assets.mjs"
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +21,6 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@mediapipe/selfie_segmentation": "^0.1.1675465747",
     "@playwright/test": "^1.64.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

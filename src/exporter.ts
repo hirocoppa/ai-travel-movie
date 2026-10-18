@@ -167,10 +167,10 @@ export async function exportMovie(
           await image.decode();
           onProgress(
             elapsed / total,
-            `${index + 1} / ${cuts.length} 写真の人物を確認中`,
+            `${index + 1} / ${cuts.length} 写真の動きを準備中`,
           );
           photo = await preparePhoto(image);
-          onPhotoMotion?.(!!photo.foreground);
+          onPhotoMotion?.(true);
         }
         const track = input ? await input.getPrimaryVideoTrack() : null;
         const base = track ? await track.getFirstTimestamp() : 0;

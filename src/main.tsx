@@ -26,7 +26,6 @@ function App() {
     animatedPhotos: number;
     stillPhotos: number;
   } | null>(null);
-  const [bgm, setBgm] = useState(true);
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -125,7 +124,7 @@ function App() {
       let musicMood: MusicMood | undefined;
       const blob = await exportMovie(plan, {
         onMusicMood: (mood) => { musicMood = mood; },
-        bgm,
+        bgm: true,
         onPhotoMotion: (animated) => {
           if (animated) animatedPhotos++;
           else stillPhotos++;
@@ -256,13 +255,8 @@ function App() {
             <option value="2">2秒</option>
           </select>
         </label>
-        <p className="hint">すべての写真に同じ秒数を使います。人物を切り分けられる写真は、人物を固定して背景を微細に動かします。</p>
-        <label className="confirmation">
-          <input type="checkbox" checked={bgm} disabled={busy || loading}
-            onChange={(e) => { setBgm(e.target.checked); setResult(null); }} />
-          BGMを自動で付ける（無料）
-        </label>
-        <p className="hint">写真の色合い・明るさから「穏やか・軽やか・あたたか」の雰囲気を選び、端末内でBGMを生成します。写真がない場合は「穏やか」です。動画の元音声を残し、BGMを控えめにします。</p>
+        <p className="hint">すべての写真に同じ秒数を使います。写真全体にゆっくりしたズームやPANをランダムに付けます。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
+        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>写真の色合い・明るさから雰囲気を選び、端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -438,9 +432,7 @@ function App() {
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {result.animatedPhotos + result.stillPhotos > 0 && (
               <p>
-                写真：背景の動き {result.animatedPhotos}枚 ／ 静止表示{" "}
-                {result.stillPhotos}枚<br />
-                人物を安全に切り分けられない写真は静止表示にしています。
+                写真：ズーム・PAN {result.animatedPhotos}枚
               </p>
             )}
             <button className="primary" onClick={share}>
@@ -499,11 +491,11 @@ function App() {
         </div>
       </section>
       <footer>
-        <p>基本編集版 · 人物写真の背景微動に対応</p>
+        <p>基本編集版 · 写真全体のズーム・PANに対応</p>
         <p>
           無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
-          写真は全体共通で1秒・1.5秒・2秒から選べます。人物を切り分けられる場合だけ、人物を固定して背景を微細に動かします。難しい写真は静止表示します。動画は冒頭最大4秒です。
+          写真は全体共通で1秒・1.5秒・2秒から選べます。写真全体に小さなズーム・PANを付け、黒帯が出ないよう縦横比を保って拡大・トリミングします。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">
