@@ -506,3 +506,19 @@ input:focus-visible {
   font-size: 9px;
   color: #929aaa;
 }
+
+.photo-duration {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.photo-duration select {
+  font: inherit;
+  padding: 10px 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: white;
+  color: inherit;
+}

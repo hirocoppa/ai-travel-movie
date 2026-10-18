@@ -35,7 +35,8 @@ export function parseCaptureDate(
   const date = Date.parse(zoned);
   return { date: Number.isFinite(date) ? date : null };
 }
-export function makePlan(assets: Asset[]): Cut[] {
+export type PhotoDuration = 1 | 1.5 | 2;
+export function makePlan(assets: Asset[], photoDuration: PhotoDuration = 1): Cut[] {
   if (assets.some((a) => !a.error && (a.date === null || !a.confirmed)))
     throw new Error("撮影日時と順序を確認してください。");
   const sorted = assets
@@ -46,7 +47,7 @@ export function makePlan(assets: Asset[]): Cut[] {
     start: 0,
     duration:
       asset.kind === "photo"
-        ? 1
+        ? photoDuration
         : Math.min(4, Math.floor(asset.duration * 30) / 30),
     capturedAt: asset.date!,
   }));

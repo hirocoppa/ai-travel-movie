@@ -30,6 +30,12 @@ describe("capture timestamps", () => {
     expect(parseCaptureDate("nonsense").date).toBeNull());
 });
 describe("timeline", () => {
+  it.each([1, 1.5, 2] as const)("applies %s seconds to every photo without changing video cuts", (duration) => {
+    const plan = makePlan([a(1), a(2, "video", 20), a(3)], duration);
+    expect(plan.map((cut) => cut.duration)).toEqual([duration, 4, duration]);
+    expect(totalDuration(plan)).toBe(duration * 2 + 4);
+    expect(totalDuration(makePlan(Array.from({ length: 200 }, (_, i) => a(i)), duration))).toBe(180);
+  });
   it("sorts mixed media chronologically and retains short source duration", () => {
     const plan = makePlan([a(3), a(1, "video", 2.5), a(2)]);
     expect(plan.map((c) => c.asset.id)).toEqual(["1", "2", "3"]);

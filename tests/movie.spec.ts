@@ -43,7 +43,8 @@ test.beforeAll(() => {
     video,
   ]);
 });
-test("mobile: import, chronological editing, original audio and exact MP4 duration", async ({
+for (const photoDuration of [1, 1.5, 2]) {
+test(`mobile: ${photoDuration}s photos, chronological editing, original audio and exact MP4 duration`, async ({
   page,
 }) => {
   const errors: string[] = [],
@@ -57,6 +58,7 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
       external.push(r.url());
   });
   await page.goto("/");
+  await page.getByLabel("写真の表示時間（全体共通）").selectOption(String(photoDuration));
   await page.locator("input[type=file]").setInputFiles([photo, video]);
   await page.getByLabel("photo.jpgの撮影日時").fill("2025-01-01T00:00");
   await page
@@ -96,7 +98,7 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
       { encoding: "utf8" },
     ),
   );
-  expect(Number(probe.format.duration)).toBe(5);
+  expect(Number(probe.format.duration)).toBe(photoDuration + 4);
   expect(probe.streams[0]).toMatchObject({
     codec_name: "h264",
     width: 1280,
@@ -141,7 +143,7 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
     "-ar",
     "48000",
     "pipe:1",
-  ]);
+  ], { maxBuffer: 4 * 1024 * 1024 });
   const samples = new Float32Array(
     raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
   );
@@ -151,7 +153,7 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
         ((to - from) * 48000),
     );
   expect(rms(0.2, 0.7)).toBeLessThan(0.001);
-  expect(rms(2, 3)).toBeGreaterThan(0.01);
+  expect(rms(photoDuration + 1, photoDuration + 2)).toBeGreaterThan(0.01);
   await page
     .locator(".result video")
     .evaluate((v: HTMLVideoElement) => v.play());
@@ -172,6 +174,7 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
   await page.getByRole("button", { name: "再編集する", exact: true }).click();
   await expect(page.locator(".result")).toHaveCount(0);
 });
+}
 test("unsupported files are explained", async ({ page }) => {
   await page.goto("/");
   await page.locator("input[type=file]").setInputFiles({

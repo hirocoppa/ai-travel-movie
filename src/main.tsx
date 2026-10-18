@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { inspectFile } from "./metadata";
-import { makePlan, totalDuration, type Asset } from "./model";
+import { makePlan, totalDuration, type Asset, type PhotoDuration } from "./model";
 import { checkSupport, exportMovie } from "./exporter";
 import "./style.css";
 const time = (seconds: number) =>
-  `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+  `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(Number.isInteger(seconds) ? 0 : 1).padStart(Number.isInteger(seconds) ? 2 : 4, "0")}`;
 const inputDate = (n: number) =>
   new Date(n - new Date(n).getTimezoneOffset() * 60000)
     .toISOString()
@@ -24,6 +24,7 @@ function App() {
     animatedPhotos: number;
     stillPhotos: number;
   } | null>(null);
+  const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -44,12 +45,12 @@ function App() {
   const unresolved = valid.filter((a) => a.date === null || !a.confirmed);
   let plan: ReturnType<typeof makePlan> = [];
   try {
-    if (!unresolved.length) plan = makePlan(assets);
+    if (!unresolved.length) plan = makePlan(assets, photoDuration);
   } catch {}
   const length = totalDuration(plan);
   const photos = valid.filter((a) => a.kind === "photo").length;
   const estimate = valid.reduce(
-    (n, a) => n + (a.kind === "photo" ? 1 : Math.min(4, a.duration)),
+    (n, a) => n + (a.kind === "photo" ? photoDuration : Math.min(4, a.duration)),
     0,
   );
   const sorted = [...assets].sort(
@@ -233,6 +234,22 @@ function App() {
             <span>完成尺の目安</span>
           </div>
         </div>
+        <label className="photo-duration">
+          写真の表示時間（全体共通）
+          <select
+            value={photoDuration}
+            disabled={busy || loading}
+            onChange={(e) => {
+              setPhotoDuration(Number(e.target.value) as PhotoDuration);
+              setResult(null);
+            }}
+          >
+            <option value="1">1秒</option>
+            <option value="1.5">1.5秒</option>
+            <option value="2">2秒</option>
+          </select>
+        </label>
+        <p className="hint">すべての写真に同じ秒数を使います。人物を切り分けられる写真は、人物を固定して背景を微細に動かします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -268,7 +285,7 @@ function App() {
                     <>
                       <small>
                         {a.kind === "photo"
-                          ? "写真 · 1秒"
+                          ? `写真 · ${photoDuration}秒`
                           : `動画 · ${time(a.duration)} → 冒頭${Math.min(4, a.duration).toFixed(1)}秒`}{" "}
                         · {a.dateSource}
                       </small>
@@ -469,7 +486,7 @@ function App() {
         <p>
           AI選別・見どころ抽出・BGM生成は未実装です。
           <br />
-          写真は1秒。人物を切り分けられる場合だけ、人物を固定して背景を微細に動かします。難しい写真は静止表示します。動画は冒頭最大4秒です。
+          写真は全体共通で1秒・1.5秒・2秒から選べます。人物を切り分けられる場合だけ、人物を固定して背景を微細に動かします。難しい写真は静止表示します。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">
