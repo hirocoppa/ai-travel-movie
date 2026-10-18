@@ -1,6 +1,6 @@
 // Original procedural instrumental, synthesized locally. No recordings or model downloads.
 export type MusicMood = "calm" | "bright" | "warm";
-export const moodLabels: Record<MusicMood, string> = { calm: "穏やか", bright: "軽やか", warm: "あたたか" };
+export const moodLabels: Record<MusicMood, string> = { calm: "明るく爽やか", bright: "明るく軽快", warm: "明るくあたたか" };
 export function moodFromPixels(pixels: Uint8ClampedArray): MusicMood {
   let light = 0, blueGreen = 0, warmth = 0, count = 0;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -11,13 +11,13 @@ export function moodFromPixels(pixels: Uint8ClampedArray): MusicMood {
     warmth += r - b;
     count++;
   }
-  if (!count) return "calm";
+  if (!count) return "bright";
   if (warmth / count > 25) return "warm";
   if (blueGreen / count > 15 || light / count < 0.42) return "calm";
   return "bright";
 }
 export async function chooseMusicMood(files: File[], signal: AbortSignal): Promise<MusicMood> {
-  const votes: Record<MusicMood, number> = { calm: 0, bright: 0, warm: 0 };
+  const votes: Record<MusicMood, number> = { bright: 0, calm: 0, warm: 0 };
   for (const file of files) {
     signal.throwIfAborted();
     const url = URL.createObjectURL(file);
@@ -37,36 +37,41 @@ export async function chooseMusicMood(files: File[], signal: AbortSignal): Promi
   return (Object.keys(votes) as MusicMood[]).sort((a, b) => votes[b] - votes[a])[0];
 }
 const chords = [
-  [48, 52, 55, 59], // Cmaj7
+  [48, 52, 55, 60], // C major
   [43, 47, 50, 55], // G
-  [45, 48, 52, 55], // Am7
-  [41, 45, 48, 52], // Fmaj7
+  [41, 45, 48, 53], // F major
+  [48, 52, 55, 57], // C6
 ];
 const melody = [72, 76, 79, 76, 74, 71, 67, 71, 72, 76, 81, 79, 77, 76, 72, 69];
 const frequency = (note: number) => 440 * 2 ** ((note - 69) / 12);
 const tone = (note: number, t: number) => Math.sin(2 * Math.PI * frequency(note) * t);
-function chordAt(t: number) {
-  return chords[Math.floor(Math.max(0, t) / (60 / 80 * 4)) % chords.length];
+export const musicTempo = (mood: MusicMood) => mood === "bright" ? 112 : mood === "warm" ? 104 : 108;
+function chordAt(t: number, beat: number) {
+  return chords[Math.floor(Math.max(0, t) / (beat * 4)) % chords.length];
 }
-export function musicSample(t: number, mood: MusicMood = "calm"): number {
-  // Change tempo and register while keeping the same original harmonic progression.
-  t *= mood === "bright" ? 1.2 : mood === "warm" ? 0.9 : 0.8;
-  const beat = 60 / 80;
+export function musicSample(t: number, mood: MusicMood = "bright"): number {
+  // Major harmony and a lively rhythm in every mood; tempo never changes pitch.
+  const beat = 60 / musicTempo(mood);
   const bar = beat * 4;
   const local = t % bar;
-  const current = chordAt(t);
-  const previous = chordAt(Math.max(0, t - bar));
+  const current = chordAt(t, beat);
+  const previous = chordAt(Math.max(0, t - bar), beat);
   const blend = Math.min(1, local / 0.18);
   let pad = 0;
   for (let i = 0; i < 4; i++)
-    pad += ((1 - blend) * tone(previous[i], t) + blend * tone(current[i], t)) * 0.07;
+    pad += ((1 - blend) * tone(previous[i], t) + blend * tone(current[i], t)) * 0.045;
   const step = Math.floor(t / beat);
   const noteTime = t % beat;
   // Soft bell/pluck, with an attack to avoid clicks at note boundaries.
   const envelope = Math.min(1, noteTime / 0.012) * Math.exp(-noteTime * 5);
-  const note = melody[step % melody.length] - (mood === "warm" ? 12 : 0);
+  const note = melody[step % melody.length];
   const pluck = (tone(note, noteTime) + 0.18 * tone(note + 12, noteTime)) * envelope * 0.24;
-  return pad + pluck;
+  const eighth = beat / 2;
+  const arpeggioTime = t % eighth;
+  const arpeggioNote = current[Math.floor(t / eighth) % current.length] + 12;
+  const arpeggio = tone(arpeggioNote, arpeggioTime) * Math.min(1, arpeggioTime / 0.008) * Math.exp(-arpeggioTime * 12) * 0.13;
+  const pulse = tone(current[0], noteTime) * Math.min(1, noteTime / 0.01) * Math.exp(-noteTime * 9) * 0.1;
+  return pad + pluck + arpeggio + pulse;
 }
 export type AudioRegion = { start: number; end: number };
 export function mixBgm(
@@ -74,7 +79,7 @@ export function mixBgm(
   start: number,
   total: number,
   originalAudio: AudioRegion[],
-  mood: MusicMood = "calm",
+  mood: MusicMood = "bright",
 ) {
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
   const nearby = originalAudio.filter((r) => r.end + 0.2 >= start && r.start - 0.2 <= start + buffer.duration);

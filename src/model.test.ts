@@ -30,19 +30,19 @@ describe("capture timestamps", () => {
     expect(parseCaptureDate("nonsense").date).toBeNull());
 });
 describe("timeline", () => {
-  it.each([1, 1.5, 2] as const)("applies %s seconds to every photo without changing video cuts", (duration) => {
+  it.each([1, 1.5, 2] as const)("keeps the first photo at 3 seconds and applies %s seconds to later photos", (duration) => {
     const plan = makePlan([a(1), a(2, "video", 20), a(3)], duration);
-    expect(plan.map((cut) => cut.duration)).toEqual([duration, 4, duration]);
-    expect(totalDuration(plan)).toBe(duration * 2 + 4);
+    expect(plan.map((cut) => cut.duration)).toEqual([3, 4, duration]);
+    expect(totalDuration(plan)).toBe(3 + duration + 4);
     expect(totalDuration(makePlan(Array.from({ length: 200 }, (_, i) => a(i)), duration))).toBe(180);
   });
   it("sorts mixed media chronologically and retains short source duration", () => {
     const plan = makePlan([a(3), a(1, "video", 2.5), a(2)]);
     expect(plan.map((c) => c.asset.id)).toEqual(["1", "2", "3"]);
-    expect(totalDuration(plan)).toBe(4.5);
+    expect(totalDuration(plan)).toBe(6.5);
   });
   it("does not repeat insufficient material", () =>
-    expect(totalDuration(makePlan([a(1), a(2, "video", 20)]))).toBe(5));
+    expect(totalDuration(makePlan([a(1), a(2, "video", 20)]))).toBe(7));
   it("produces exactly 180 seconds for excess media and keeps chronology", () => {
     const plan = makePlan(
       Array.from({ length: 200 }, (_, i) =>
@@ -64,6 +64,16 @@ describe("timeline", () => {
     expect(
       plan.some((c) => Number(c.asset.id) > 400 && Number(c.asset.id) < 600),
     ).toBe(true);
+  });
+  it("keeps the first photo for 3 seconds even when earlier videos precede it", () => {
+    const plan = makePlan([a(3), a(1, "video", 2), a(2)], 1.5);
+    expect(plan.map((cut) => cut.duration)).toEqual([2, 3, 1.5]);
+  });
+  it("retains the title photo and 180-second limit when thinning excessive video", () => {
+    const assets = Array.from({ length: 1000 }, (_, i) => a(i, i === 501 ? "photo" : "video", 20));
+    const plan = makePlan(assets);
+    expect(plan.find((cut) => cut.asset.kind === "photo")?.duration).toBe(3);
+    expect(totalDuration(plan)).toBe(180);
   });
   it("quantizes short video to full frames", () => {
     const plan = makePlan([a(1, "video", 2.51)]);

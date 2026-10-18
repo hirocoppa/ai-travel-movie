@@ -9,6 +9,8 @@ export type Asset = {
   confirmed: boolean;
   error?: string;
   thumbnail?: string;
+  titleDate?: string;
+  location?: string;
 };
 export type Cut = {
   asset: Asset;
@@ -42,12 +44,13 @@ export function makePlan(assets: Asset[], photoDuration: PhotoDuration = 1): Cut
   const sorted = assets
     .filter((a) => !a.error)
     .sort((a, b) => a.date! - b.date!);
+  const firstPhoto = sorted.find((asset) => asset.kind === "photo");
   const candidates: Cut[] = sorted.map((asset) => ({
     asset,
     start: 0,
     duration:
       asset.kind === "photo"
-        ? photoDuration
+        ? asset === firstPhoto ? 3 : photoDuration
         : Math.min(4, Math.floor(asset.duration * 30) / 30),
     capturedAt: asset.date!,
   }));
@@ -56,13 +59,13 @@ export function makePlan(assets: Asset[], photoDuration: PhotoDuration = 1): Cut
   // Keep temporal coverage without inventing a quality score or repeating media.
   // Visit endpoints and then evenly subdivide the trip. This preserves temporal
   // coverage even when the input contains hundreds of long clips.
-  const indices = [0, candidates.length - 1];
+  const indices = [...new Set([0, sorted.findIndex((asset) => asset === firstPhoto), candidates.length - 1].filter((i) => i >= 0))];
   const ranges: [number, number][] = [[1, candidates.length - 2]];
   for (let i = 0; i < ranges.length; i++) {
     const [left, right] = ranges[i];
     if (left > right) continue;
     const mid = Math.floor((left + right) / 2);
-    indices.push(mid);
+    if (!indices.includes(mid)) indices.push(mid);
     ranges.push([left, mid - 1], [mid + 1, right]);
   }
   let remainingFrames = 5400;

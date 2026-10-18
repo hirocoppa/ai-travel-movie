@@ -1,3 +1,6 @@
+import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
+import { TitlePreview } from "./title-preview";
+import type { PhotoTitle } from "./title";
 import { moodLabels, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -26,17 +29,23 @@ function App() {
     animatedPhotos: number;
     stillPhotos: number;
   } | null>(null);
+  const [size, setSize] = useState<OutputSize>(defaultOutputSize);
+  const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
+  const [confirmedTitle, setConfirmedTitle] = useState("");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const active = useRef(false);
   useEffect(() => {
-    checkSupport().then(setSupport);
+    let disposed = false;
+    setSupport(undefined);
+    checkSupport(size).then((value) => { if (!disposed) setSupport(value); });
     return () => {
+      disposed = true;
       controller.current?.abort();
     };
-  }, []);
+  }, [size]);
   useEffect(
     () => () => {
       if (result) URL.revokeObjectURL(result.url);
@@ -49,11 +58,24 @@ function App() {
   try {
     if (!unresolved.length) plan = makePlan(assets, photoDuration);
   } catch {}
+  const firstPhoto = plan.find((cut) => cut.asset.kind === "photo")?.asset;
+  const title: PhotoTitle = firstPhoto ? {
+    date: titleEdits[firstPhoto.id]?.date ?? firstPhoto.titleDate ?? (firstPhoto.date !== null ? inputDate(firstPhoto.date).slice(0, 10) : ""),
+    place: titleEdits[firstPhoto.id]?.place ?? firstPhoto.location ?? "",
+  } : { date: "", place: "" };
+  const titleKey = JSON.stringify([firstPhoto?.id, title.date, title.place]);
+  const titleReady = !firstPhoto || confirmedTitle === titleKey;
+  function editTitle(field: keyof PhotoTitle, value: string) {
+    if (!firstPhoto) return;
+    setTitleEdits((old) => ({ ...old, [firstPhoto.id]: { ...old[firstPhoto.id], [field]: value } }));
+    setConfirmedTitle("");
+    setResult(null);
+  }
   const length = totalDuration(plan);
   const photos = valid.filter((a) => a.kind === "photo").length;
   const estimate = valid.reduce(
     (n, a) => n + (a.kind === "photo" ? photoDuration : Math.min(4, a.duration)),
-    0,
+    photos > 0 ? 3 - photoDuration : 0,
   );
   const sorted = [...assets].sort(
     (a, b) => (a.date ?? Infinity) - (b.date ?? Infinity),
@@ -91,6 +113,7 @@ function App() {
               ...a,
               date: value ? new Date(value).getTime() : null,
               confirmed: !!value,
+              titleDate: value.slice(0, 10),
               dateSource: "手動指定（この端末の時差）",
             }
           : a,
@@ -98,7 +121,7 @@ function App() {
     );
   }
   async function create() {
-    if (active.current || !orderConfirmed || unresolved.length || !plan.length)
+    if (active.current || !orderConfirmed || !titleReady || unresolved.length || !plan.length)
       return;
     active.current = true;
     controller.current = new AbortController();
@@ -125,6 +148,8 @@ function App() {
       const blob = await exportMovie(plan, {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
+        size,
+        title,
         onPhotoMotion: (animated) => {
           if (animated) animatedPhotos++;
           else stillPhotos++;
@@ -241,6 +266,12 @@ function App() {
           </div>
         </div>
         <label className="photo-duration">
+          出力サイズ
+          <select value={size} disabled={busy || loading} onChange={(e) => { setSize(e.target.value as OutputSize); setResult(null); }}>
+            {Object.keys(outputSizes).map((value) => <option key={value} value={value}>{value.replace("x", " × ")}</option>)}
+          </select>
+        </label>
+        <label className="photo-duration">
           写真の表示時間（全体共通）
           <select
             value={photoDuration}
@@ -255,8 +286,8 @@ function App() {
             <option value="2">2秒</option>
           </select>
         </label>
-        <p className="hint">すべての写真に同じ秒数を使います。写真全体にゆっくりしたズームやPANをランダムに付けます。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
-        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>写真の色合い・明るさから雰囲気を選び、端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
+        <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。写真全体にゆっくりしたズームやPANをランダムに付けます。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
+        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -295,7 +326,7 @@ function App() {
                     <>
                       <small>
                         {a.kind === "photo"
-                          ? `写真 · ${photoDuration}秒`
+                          ? `写真 · ${a.id === firstPhoto?.id ? 3 : photoDuration}秒`
                           : `動画 · ${time(a.duration)} → 冒頭${Math.min(4, a.duration).toFixed(1)}秒`}{" "}
                         · {a.dateSource}
                       </small>
@@ -382,6 +413,25 @@ function App() {
             )}
           </div>
         )}
+        {firstPhoto && (
+          <section className="intro-settings">
+            <h2>1枚目の写真の日付・場所を確認</h2>
+            <p className="hint">{firstPhoto.file.name} を3秒表示し、最初の2秒だけ左下に文字を入れます。撮影順で最初の写真が対象です。</p>
+            <label>表示する日付
+              <input value={title.date} maxLength={80} disabled={busy || loading} onChange={(e) => editTitle("date", e.target.value)} />
+            </label>
+            <label>表示する場所
+              <input value={title.place} maxLength={120} disabled={busy || loading} onChange={(e) => editTitle("place", e.target.value)} placeholder="場所を入力" />
+            </label>
+            <p className="hint">日付・地名は写真のメタデータから取得します。GPSのみの場合は緯度・経度を表示します。地名への変換は行いません。情報がない項目は入力でき、空欄の項目は表示しません。</p>
+            <TitlePreview file={firstPhoto.file} title={title} size={size} />
+            <label className="confirmation">
+              <input type="checkbox" checked={titleReady} disabled={busy || loading} onChange={(e) => setConfirmedTitle(e.target.checked ? titleKey : "")} />
+              表示する日付と場所を確認しました
+            </label>
+            {!titleReady && <p className="confirmation-alert">日付と場所を確認・修正し、確認チェックを入れてください。</p>}
+          </section>
+        )}
         {support && (
           <p className="notice" role="status">
             {support}
@@ -394,13 +444,14 @@ function App() {
             busy ||
             loading ||
             !orderConfirmed ||
+            !titleReady ||
             !plan.length ||
             support !== null
           }
         >
           {busy ? "動画を作成しています…" : "3分動画を作成"} <span>↗</span>
         </button>
-        <p className="under-button">720p · MP4 · 最大180秒 · 約60MBが目安</p>
+        <p className="under-button">{size.replace("x", " × ")} · MP4 · 最大180秒</p>
         {busy && (
           <div className="progress" role="status">
             <progress value={progress} max="1" />
@@ -484,7 +535,7 @@ function App() {
           <span>▱</span>
           <h3>そのまま、持ち歩こう</h3>
           <p>
-            軽い720pのMP4で、
+            選べるサイズのMP4で、
             <br />
             保存もシェアもシンプルに。
           </p>
@@ -495,7 +546,7 @@ function App() {
         <p>
           無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
-          写真は全体共通で1秒・1.5秒・2秒から選べます。写真全体に小さなズーム・PANを付け、黒帯が出ないよう縦横比を保って拡大・トリミングします。動画は冒頭最大4秒です。
+          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真全体に小さなズーム・PANを付け、黒帯が出ないよう縦横比を保って拡大・トリミングします。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">

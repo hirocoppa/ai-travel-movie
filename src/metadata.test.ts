@@ -36,3 +36,20 @@ it("rejects invalid atom sizes", async () =>
   expect(
     await quickTimeDate(new File([new Uint8Array(16)], "v.mov")),
   ).toBeNull());
+
+import { readPhotoTags, photoTitleMetadata } from "./metadata";
+import { withPhotoMetadata } from "../tests/fixtures/photo-metadata";
+it("reads the original local calendar date and place names from actual JPEG metadata", async () => {
+  const bytes = withPhotoMetadata(new Uint8Array([255, 216, 255, 217]));
+  const tags = await readPhotoTags(bytes);
+  expect(photoTitleMetadata(tags!)).toEqual({ titleDate: "2025-01-02", location: "Asakusa · Tokyo · Japan" });
+});
+it("uses valid GPS coordinates when metadata has no place name", async () => {
+  const bytes = withPhotoMetadata(new Uint8Array([255, 216, 255, 217]), false);
+  const tags = await readPhotoTags(bytes);
+  expect(photoTitleMetadata(tags!).location).toBe("35.68333, 139.70000");
+});
+it("leaves absent or invalid date and location information blank", () => {
+  expect(photoTitleMetadata({})).toEqual({ titleDate: "", location: "" });
+  expect(photoTitleMetadata({ latitude: NaN, longitude: 500 }).location).toBe("");
+});

@@ -1,3 +1,5 @@
+import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
+import { drawPhotoTitle, type PhotoTitle } from "./title";
 import { mixBgm, chooseMusicMood, type MusicMood, type AudioRegion } from "./music";
 import {
   preparePhoto,
@@ -36,18 +38,16 @@ async function ensureAac() {
   })();
   await aacReady;
 }
-export async function checkSupport(): Promise<string | null> {
+export async function checkSupport(size: OutputSize = defaultOutputSize): Promise<string | null> {
   try {
     if (!("VideoEncoder" in globalThis))
       return "このブラウザにはMP4作成に必要なWebCodecsがありません。最新のiOS / Safariへ更新するか、Mac・PCの最新Chromeで開いてください。";
     if (
       !(await canEncodeVideo("avc", {
-        width: 1280,
-        height: 720,
-        bitrate: 2500000,
+        ...outputSizes[size],
       }))
     )
-      return "この端末ではH.264映像を書き出せません。Mac・PCの最新Chromeをお試しください。";
+      return "この端末では選択したサイズのH.264映像を書き出せません。サイズを下げるか、Mac・PCの最新Chromeをお試しください。";
     await ensureAac();
     if (
       !(await canEncodeAudio("aac", {
@@ -63,6 +63,8 @@ export async function checkSupport(): Promise<string | null> {
   }
 }
 export interface ExportOptions {
+  size?: OutputSize;
+  title?: PhotoTitle;
   bgm?: boolean;
   onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
@@ -75,20 +77,21 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, size = defaultOutputSize, title }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
-  const unsupported = await checkSupport();
+  const unsupported = await checkSupport(size);
   if (unsupported) throw new Error(unsupported);
-  let musicMood: MusicMood = "calm";
+  let musicMood: MusicMood = "bright";
   if (bgm) {
     onProgress(0, "写真の色合いからBGMの雰囲気を選んでいます");
     musicMood = await chooseMusicMood(cuts.filter((c) => c.asset.kind === "photo").map((c) => c.asset.file), signal);
     onMusicMood?.(musicMood);
   }
   const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
+  const { width, height, bitrate } = outputSizes[size];
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d", { alpha: false })!;
   const target = new BufferTarget();
   const output = new Output({
@@ -97,11 +100,12 @@ export async function exportMovie(
   });
   const video = new CanvasSource(canvas, {
     codec: "avc",
-    bitrate: 2500000,
+    bitrate,
     bitrateMode: "variable",
     keyFrameInterval: 2,
   });
   const total = totalDuration(cuts);
+  const firstPhoto = cuts.find((cut) => cut.asset.kind === "photo");
   let elapsed = 0;
   const originalAudio: AudioRegion[] = [];
   if (bgm) {
@@ -169,15 +173,15 @@ export async function exportMovie(
             elapsed / total,
             `${index + 1} / ${cuts.length} 写真の動きを準備中`,
           );
-          photo = await preparePhoto(image);
+          photo = await preparePhoto(image, width, height);
           onPhotoMotion?.(true);
         }
         const track = input ? await input.getPrimaryVideoTrack() : null;
         const base = track ? await track.getFirstTimestamp() : 0;
         const sink = track
           ? new CanvasSink(track, {
-              width: 1280,
-              height: 720,
+              width,
+              height,
               fit: "contain",
               poolSize: 2,
             })
@@ -193,23 +197,24 @@ export async function exportMovie(
           for (let f = 0; f < frames; f++) {
             cancelled(signal);
             ctx.fillStyle = "#000";
-            ctx.fillRect(0, 0, 1280, 720);
+            ctx.fillRect(0, 0, width, height);
             if (iterator) {
               const next = await iterator.next();
               if (!next.value)
                 throw new Error(
                   `${cut.asset.file.name}: 映像フレームを取得できません。`,
                 );
-              ctx.drawImage(next.value.canvas, 0, 0, 1280, 720);
+              ctx.drawImage(next.value.canvas, 0, 0, width, height);
             } else if (photo) {
               drawPhoto(ctx, photo, frames > 1 ? f / (frames - 1) : 0);
             }
+            if (cut === firstPhoto && f < 60 && title) drawPhotoTitle(ctx, title);
             // Fade only at the beginning and end of the complete movie.
             const now = elapsed + f / 30;
             const fade = Math.min(1, now / 0.3, (total - now - 1 / 30) / 0.4);
             if (fade < 1) {
               ctx.fillStyle = `rgba(0,0,0,${1 - Math.max(0, fade)})`;
-              ctx.fillRect(0, 0, 1280, 720);
+              ctx.fillRect(0, 0, width, height);
             }
             await video.add(now, 1 / 30);
             if (f % 15 === 0) {

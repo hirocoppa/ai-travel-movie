@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mixBgm, moodFromPixels, type MusicMood, type AudioRegion } from "./music";
+import { mixBgm, moodFromPixels, chooseMusicMood, musicTempo, type MusicMood, type AudioRegion } from "./music";
 function render(start: number, duration: number, regions: AudioRegion[] = [], original = 0, mood: MusicMood = "calm") {
   const data = new Float32Array(Math.round(duration * 48000)).fill(original);
   mixBgm({ length: data.length, duration, sampleRate: 48000, numberOfChannels: 1, getChannelData: () => data } as unknown as AudioBuffer, start, 6, regions, mood);
@@ -7,6 +7,10 @@ function render(start: number, duration: number, regions: AudioRegion[] = [], or
 }
 const rms = (data: Float32Array) => Math.sqrt(data.reduce((s, n) => s + n * n, 0) / data.length);
 describe("automatic local BGM", () => {
+  it("defaults to bright music with no photos and keeps all tempos upbeat", async () => {
+    expect(await chooseMusicMood([], new AbortController().signal)).toBe("bright");
+    for (const mood of ["bright", "calm", "warm"] as const) expect(musicTempo(mood)).toBeGreaterThanOrEqual(100);
+  });
   it("selects a mood from warm, cool, bright and dark image colors", () => {
     expect(moodFromPixels(new Uint8ClampedArray([240, 140, 100, 255]))).toBe("warm");
     expect(moodFromPixels(new Uint8ClampedArray([40, 140, 220, 255]))).toBe("calm");

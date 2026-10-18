@@ -540,3 +540,9 @@ input:focus-visible {
 .notice.confirmation-alert {
   background: #fff1f1;
 }
+
+.intro-settings { margin: 24px 0; padding: 20px 0; border-top: 1px solid #edf0f5; }
+.intro-settings > label:not(.confirmation) { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; font-size: 13px; }
+.intro-settings input:not([type=checkbox]) { font: inherit; padding: 10px; border: 1px solid #dce2ef; border-radius: 8px; min-width: 0; }
+.title-preview { width: 100%; height: auto; display: block; border-radius: 10px; background: #e8ebf2; }
+.photo-duration { margin-top: 16px; }

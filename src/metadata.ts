@@ -57,6 +57,29 @@ export async function quickTimeDate(file: File): Promise<number | null> {
   }
   return null;
 }
+export async function readPhotoTags(file: File | Uint8Array): Promise<Record<string, unknown> | null> {
+  return exifr.parse(file, {
+    exif: { pick: ["DateTimeOriginal", "CreateDate", "OffsetTimeOriginal", "OffsetTimeDigitized"] },
+    gps: true,
+    iptc: true,
+    xmp: true,
+    icc: false,
+    reviveValues: false,
+  }).catch(() => null);
+}
+export function photoTitleMetadata(tags: Record<string, unknown>): { titleDate: string; location: string } {
+  const rawDate = tags.DateTimeOriginal ?? tags.CreateDate;
+  const dateMatch = typeof rawDate === "string" ? rawDate.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})/) : null;
+  const titleDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : "";
+  const parts = [tags.Sublocation ?? tags.Location, tags.City, tags.State ?? tags.ProvinceState, tags.Country ?? tags.CountryName]
+    .filter((value): value is string => typeof value === "string" && !!value.trim());
+  let location = [...new Set(parts.map((value) => value.trim()))].join(" · ");
+  const latitude = tags.latitude, longitude = tags.longitude;
+  if (!location && typeof latitude === "number" && typeof longitude === "number" &&
+      Number.isFinite(latitude) && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180)
+    location = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+  return { titleDate, location };
+}
 export async function inspectFile(file: File): Promise<Asset> {
   const asset: Asset = {
     id: crypto.randomUUID(),
@@ -76,23 +99,13 @@ export async function inspectFile(file: File): Promise<Asset> {
         "未対応形式です。JPEG / PNG / HEIC / MOV / MP4を選んでください。",
       );
     if (asset.kind === "photo") {
-      const tags = await exifr
-        .parse(file, {
-          pick: [
-            "DateTimeOriginal",
-            "CreateDate",
-            "OffsetTimeOriginal",
-            "OffsetTimeDigitized",
-          ],
-          reviveValues: false,
-        })
-        .catch(() => null);
+      const tags = await readPhotoTags(file);
       if (tags) {
         const parsed = parseCaptureDate(
           tags.DateTimeOriginal ?? tags.CreateDate,
-          tags.OffsetTimeOriginal ?? tags.OffsetTimeDigitized,
+          typeof (tags.OffsetTimeOriginal ?? tags.OffsetTimeDigitized) === "string" ? (tags.OffsetTimeOriginal ?? tags.OffsetTimeDigitized) as string : undefined,
         );
-        Object.assign(asset, parsed);
+        Object.assign(asset, parsed, photoTitleMetadata(tags));
         asset.dateSource =
           parsed.date !== null ? "EXIF 撮影日時" : "EXIF・時差の確認が必要";
       }

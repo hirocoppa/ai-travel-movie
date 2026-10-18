@@ -1,6 +1,7 @@
+import { withPhotoMetadata } from "./fixtures/photo-metadata";
 import { test, expect } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const fixtures = mkdtempSync(join(tmpdir(), "travel-movie-"));
@@ -43,7 +44,7 @@ test.beforeAll(() => {
     video,
   ]);
 });
-for (const photoDuration of [1, 1.5, 2]) {
+for (const [photoDuration, width, height] of [[1, 1920, 1080], [1.5, 1280, 720], [2, 960, 540]]) {
 test(`mobile: ${photoDuration}s photos, chronological editing, original audio and exact MP4 duration`, async ({
   page,
 }) => {
@@ -58,6 +59,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       external.push(r.url());
   });
   await page.goto("/");
+  await page.getByLabel("出力サイズ").selectOption(`${width}x${height}`);
   await page.getByLabel("写真の表示時間（全体共通）").selectOption(String(photoDuration));
 
   await page.locator("input[type=file]").setInputFiles([photo, video]);
@@ -69,6 +71,11 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
     page.getByRole("button", { name: "3分動画を作成" }),
   ).toBeDisabled();
   await page.getByRole("checkbox", { name: "表示された撮影順で編集する" }).check();
+  await expect(page.getByLabel("表示する日付", { exact: true })).toHaveValue("2025-01-01");
+  await page.getByLabel("表示する日付", { exact: true }).fill("2025年1月1日");
+  await page.getByLabel("表示する場所").fill("東京・浅草");
+  await expect(page.getByRole("button", { name: "3分動画を作成" })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "表示する日付と場所を確認しました" }).check();
   await page.getByRole("button", { name: "3分動画を作成" }).click();
   await page.locator(".download").waitFor({ timeout: 120000 });
   const bytes = await page.evaluate(async () =>
@@ -99,14 +106,25 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       { encoding: "utf8" },
     ),
   );
-  expect(Number(probe.format.duration)).toBe(photoDuration + 4);
+  expect(Number(probe.format.duration)).toBe(7);
   expect(probe.streams[0]).toMatchObject({
     codec_name: "h264",
-    width: 1280,
-    height: 720,
+    width,
+    height,
     r_frame_rate: "30/1",
   });
   expect(probe.streams[1].codec_name).toBe("aac");
+  // A uniform photo makes text pixels distinguishable from the background.
+  // The lower-left title must be present at 1s and absent after 2s.
+  const countTitlePixels = (time: string) => {
+    const raw = execFileSync("ffmpeg", ["-v", "error", "-ss", time, "-i", output, "-frames:v", "1", "-vf",
+      `crop=${width}:${height / 2}:0:${height / 2},format=rgb24`, "-f", "rawvideo", "pipe:1"], { maxBuffer: 8 * 1024 * 1024 });
+    let bright = 0;
+    for (let i = 0; i < raw.length; i += 3) if (raw[i] > 210 && raw[i + 1] > 210 && raw[i + 2] > 210) bright++;
+    return bright;
+  };
+  expect(countTitlePixels("1")).toBeGreaterThan(100);
+  expect(countTitlePixels("2.4")).toBe(0);
   // Cover-fitted photos fill the output horizontally without black side bars.
   const photoWidthAt = (time: string) => {
     const row = execFileSync("ffmpeg", [
@@ -119,18 +137,18 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       "-frames:v",
       "1",
       "-vf",
-      "crop=1280:2:0:360,format=rgb24",
+      `crop=${width}:2:0:${height / 2},format=rgb24`,
       "-f",
       "rawvideo",
       "pipe:1",
     ]);
-    let width = 0;
-    for (let i = 0; i < 1280 * 3; i += 3)
-      if (row[i] > 120 && row[i + 1] > 20) width++;
-    return width;
+    let filledPixels = 0;
+    for (let i = 0; i < width * 3; i += 3)
+      if (row[i] > 120 && row[i + 1] > 20) filledPixels++;
+    return filledPixels;
   };
-  expect(photoWidthAt("0.6")).toBe(1280);
-  expect(photoWidthAt("0.4")).toBe(1280);
+  expect(photoWidthAt("0.6")).toBe(width);
+  expect(photoWidthAt("0.4")).toBe(width);
 
   // Decode the MP4: automatic BGM is audible and original video sound survives mixing.
   const raw = execFileSync("ffmpeg", [
@@ -155,11 +173,11 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
         ((to - from) * 48000),
     );
   expect(rms(0.2, 0.7)).toBeGreaterThan(0.03);
-  await expect(page.locator(".result")).toContainText("BGM：あたたか");
-  expect(rms(photoDuration + 1, photoDuration + 2)).toBeGreaterThan(0.01);
+  await expect(page.locator(".result")).toContainText("BGM：明るくあたたか");
+  expect(rms(4, 5)).toBeGreaterThan(0.01);
   // The source clip contains a 440 Hz tone; BGM alone must not satisfy this check.
   let real = 0, imaginary = 0;
-  const offset = Math.round((photoDuration + 1) * 48000);
+  const offset = 4 * 48000;
   for (let i = 0; i < 48000; i++) {
     real += samples[offset + i] * Math.cos(2 * Math.PI * 440 * i / 48000);
     imaginary += samples[offset + i] * Math.sin(2 * Math.PI * 440 * i / 48000);
@@ -211,4 +229,27 @@ test("missing video encoder is explained without silently exporting another form
   await expect(
     page.getByRole("button", { name: "3分動画を作成" }),
   ).toBeDisabled();
+});
+
+test("metadata fills the first-photo title and edits or photo-order changes require reconfirmation", async ({ page }) => {
+  await page.goto("/");
+  const tagged = withPhotoMetadata(new Uint8Array(readFileSync(photo)));
+  await page.locator("input[type=file]").setInputFiles({ name: "tagged.jpg", mimeType: "image/jpeg", buffer: Buffer.from(tagged) });
+  await expect(page.getByLabel("表示する日付", { exact: true })).toHaveValue("2025-01-02");
+  await expect(page.getByLabel("表示する場所")).toHaveValue("Asakusa · Tokyo · Japan");
+  await page.getByRole("checkbox", { name: "表示された撮影順で編集する" }).check();
+  await page.getByRole("checkbox", { name: "表示する日付と場所を確認しました" }).check();
+  await expect(page.getByRole("button", { name: "3分動画を作成" })).toBeEnabled();
+  await page.getByLabel("表示する場所").fill("浅草寺");
+  await expect(page.getByRole("checkbox", { name: "表示する日付と場所を確認しました" })).not.toBeChecked();
+  await expect(page.getByRole("button", { name: "3分動画を作成" })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "表示する日付と場所を確認しました" }).check();
+  await page.locator("input[type=file]").setInputFiles(photo);
+  await page.getByLabel("photo.jpgの撮影日時").fill("2025-01-01T00:00");
+  await page.getByRole("checkbox", { name: "表示された撮影順で編集する" }).check();
+  await expect(page.getByLabel("表示する日付", { exact: true })).toHaveValue("2025-01-01");
+  await expect(page.getByLabel("表示する場所")).toHaveValue("");
+  await expect(page.getByRole("checkbox", { name: "表示する日付と場所を確認しました" })).not.toBeChecked();
+  await page.getByLabel("photo.jpgを削除").click();
+  await expect(page.getByLabel("表示する場所")).toHaveValue("浅草寺");
 });
