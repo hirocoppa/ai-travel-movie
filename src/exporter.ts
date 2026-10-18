@@ -1,3 +1,4 @@
+import { mixBgm, chooseMusicMood, type MusicMood, type AudioRegion } from "./music";
 import {
   preparePhoto,
   drawPhoto,
@@ -62,6 +63,8 @@ export async function checkSupport(): Promise<string | null> {
   }
 }
 export interface ExportOptions {
+  bgm?: boolean;
+  onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
   onProgress: (fraction: number, message: string) => void;
   onPhotoMotion?: (animated: boolean) => void;
@@ -72,11 +75,17 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport();
   if (unsupported) throw new Error(unsupported);
+  let musicMood: MusicMood = "calm";
+  if (bgm) {
+    onProgress(0, "写真の色合いからBGMの雰囲気を選んでいます");
+    musicMood = await chooseMusicMood(cuts.filter((c) => c.asset.kind === "photo").map((c) => c.asset.file), signal);
+    onMusicMood?.(musicMood);
+  }
   const canvas = document.createElement("canvas");
   canvas.width = 1280;
   canvas.height = 720;
@@ -94,6 +103,21 @@ export async function exportMovie(
   });
   const total = totalDuration(cuts);
   let elapsed = 0;
+  const originalAudio: AudioRegion[] = [];
+  if (bgm) {
+    let at = 0;
+    for (const cut of cuts) {
+      cancelled(signal);
+      if (cut.asset.kind === "video") {
+        const input = openInput(cut.asset.file);
+        try {
+          if (await input.getPrimaryAudioTrack())
+            originalAudio.push({ start: at, end: at + cut.duration });
+        } finally { input.dispose(); }
+      }
+      at += cut.duration;
+    }
+  }
   const audioPackets = new EncodedAudioPacketSource("aac");
   let audioDrain = Promise.resolve();
   let audioError: unknown;
@@ -199,7 +223,7 @@ export async function exportMovie(
         } finally {
           await iterator?.return?.();
         }
-        // Render only one cut's audio at a time. Keep original sound; photos are silent.
+        // Render one cut at a time; the music uses absolute time to stay continuous.
         const offline = new OfflineAudioContext(
           2,
           Math.max(1, Math.round(duration * 48000)),
@@ -239,7 +263,10 @@ export async function exportMovie(
           }
         }
         cancelled(signal);
-        await audio.add(await offline.startRendering());
+        const rendered = await offline.startRendering();
+        cancelled(signal);
+        if (bgm) mixBgm(rendered, elapsed, total, originalAudio, musicMood);
+        await audio.add(rendered);
         await audioDrain;
         if (audioError) throw audioError;
       } finally {

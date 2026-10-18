@@ -1,3 +1,4 @@
+import { moodLabels, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { inspectFile } from "./metadata";
@@ -21,9 +22,11 @@ function App() {
   const [result, setResult] = useState<{
     url: string;
     blob: Blob;
+    musicMood?: MusicMood;
     animatedPhotos: number;
     stillPhotos: number;
   } | null>(null);
+  const [bgm, setBgm] = useState(true);
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -119,7 +122,10 @@ function App() {
       } catch {}
       let animatedPhotos = 0,
         stillPhotos = 0;
+      let musicMood: MusicMood | undefined;
       const blob = await exportMovie(plan, {
+        onMusicMood: (mood) => { musicMood = mood; },
+        bgm,
         onPhotoMotion: (animated) => {
           if (animated) animatedPhotos++;
           else stillPhotos++;
@@ -132,6 +138,7 @@ function App() {
       });
       setResult({
         blob,
+        musicMood,
         url: URL.createObjectURL(blob),
         animatedPhotos,
         stillPhotos,
@@ -250,6 +257,12 @@ function App() {
           </select>
         </label>
         <p className="hint">すべての写真に同じ秒数を使います。人物を切り分けられる写真は、人物を固定して背景を微細に動かします。</p>
+        <label className="confirmation">
+          <input type="checkbox" checked={bgm} disabled={busy || loading}
+            onChange={(e) => { setBgm(e.target.checked); setResult(null); }} />
+          BGMを自動で付ける（無料）
+        </label>
+        <p className="hint">写真の色合い・明るさから「穏やか・軽やか・あたたか」の雰囲気を選び、端末内でBGMを生成します。写真がない場合は「穏やか」です。動画の元音声を残し、BGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -418,6 +431,7 @@ function App() {
             <span className="eyebrow">YOUR MOVIE IS READY</span>
             <h2>旅の映画ができました。</h2>
             <video src={result.url} controls playsInline />
+            <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（写真の色合いから自動選択）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {result.animatedPhotos + result.stillPhotos > 0 && (
               <p>
@@ -484,7 +498,7 @@ function App() {
       <footer>
         <p>基本編集版 · 人物写真の背景微動に対応</p>
         <p>
-          AI選別・見どころ抽出・BGM生成は未実装です。
+          無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
           写真は全体共通で1秒・1.5秒・2秒から選べます。人物を切り分けられる場合だけ、人物を固定して背景を微細に動かします。難しい写真は静止表示します。動画は冒頭最大4秒です。
         </p>

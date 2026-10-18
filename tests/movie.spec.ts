@@ -59,6 +59,8 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
   });
   await page.goto("/");
   await page.getByLabel("写真の表示時間（全体共通）").selectOption(String(photoDuration));
+  if (photoDuration !== 1.5)
+    await page.getByRole("checkbox", { name: "BGMを自動で付ける（無料）" }).uncheck();
   await page.locator("input[type=file]").setInputFiles([photo, video]);
   await page.getByLabel("photo.jpgの撮影日時").fill("2025-01-01T00:00");
   await page
@@ -67,7 +69,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
   await expect(
     page.getByRole("button", { name: "3分動画を作成" }),
   ).toBeDisabled();
-  await page.getByRole("checkbox").check();
+  await page.getByRole("checkbox", { name: "表示された撮影順で編集する" }).check();
   await page.getByRole("button", { name: "3分動画を作成" }).click();
   await page.locator(".download").waitFor({ timeout: 120000 });
   const bytes = await page.evaluate(async () =>
@@ -130,7 +132,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
   };
   expect(photoWidthAt("0.6")).toBe(photoWidthAt("0.4"));
 
-  // Decode real audio and check the photo section is quiet and the video has sound.
+  // Decode the MP4: BGM follows the toggle and original video sound survives mixing.
   const raw = execFileSync("ffmpeg", [
     "-v",
     "error",
@@ -152,8 +154,19 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
       samples.slice(from * 48000, to * 48000).reduce((s, x) => s + x * x, 0) /
         ((to - from) * 48000),
     );
-  expect(rms(0.2, 0.7)).toBeLessThan(0.001);
+  if (photoDuration === 1.5) {
+    expect(rms(0.2, 0.7)).toBeGreaterThan(0.005);
+    await expect(page.locator(".result")).toContainText("あたたか");
+  } else expect(rms(0.2, 0.7)).toBeLessThan(0.001);
   expect(rms(photoDuration + 1, photoDuration + 2)).toBeGreaterThan(0.01);
+  // The source clip contains a 440 Hz tone; BGM alone must not satisfy this check.
+  let real = 0, imaginary = 0;
+  const offset = Math.round((photoDuration + 1) * 48000);
+  for (let i = 0; i < 48000; i++) {
+    real += samples[offset + i] * Math.cos(2 * Math.PI * 440 * i / 48000);
+    imaginary += samples[offset + i] * Math.sin(2 * Math.PI * 440 * i / 48000);
+  }
+  expect(2 * Math.hypot(real, imaginary) / 48000).toBeGreaterThan(0.05);
   await page
     .locator(".result video")
     .evaluate((v: HTMLVideoElement) => v.play());
