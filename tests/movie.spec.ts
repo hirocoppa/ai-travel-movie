@@ -104,6 +104,30 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
     r_frame_rate: "30/1",
   });
   expect(probe.streams[1].codec_name).toBe("aac");
+  // A uniform photo has no detected person and must stay still.
+  const photoWidthAt = (time: string) => {
+    const row = execFileSync("ffmpeg", [
+      "-v",
+      "error",
+      "-ss",
+      time,
+      "-i",
+      output,
+      "-frames:v",
+      "1",
+      "-vf",
+      "crop=1280:2:0:360,format=rgb24",
+      "-f",
+      "rawvideo",
+      "pipe:1",
+    ]);
+    let width = 0;
+    for (let i = 0; i < 1280 * 3; i += 3)
+      if (row[i] > 120 && row[i + 1] > 20) width++;
+    return width;
+  };
+  expect(photoWidthAt("0.6")).toBe(photoWidthAt("0.4"));
+
   // Decode real audio and check the photo section is quiet and the video has sound.
   const raw = execFileSync("ffmpeg", [
     "-v",
@@ -150,13 +174,11 @@ test("mobile: import, chronological editing, original audio and exact MP4 durati
 });
 test("unsupported files are explained", async ({ page }) => {
   await page.goto("/");
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "not-a-photo.gif",
-      mimeType: "image/gif",
-      buffer: Buffer.from("unsupported"),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "not-a-photo.gif",
+    mimeType: "image/gif",
+    buffer: Buffer.from("unsupported"),
+  });
   await expect(page.getByRole("alert")).toContainText("未対応形式");
   await expect(
     page.getByRole("button", { name: "3分動画を作成" }),

@@ -1,4 +1,10 @@
 import {
+  preparePhoto,
+  drawPhoto,
+  releasePhoto,
+  type PhotoLayers,
+} from "./photo-motion";
+import {
   Output,
   NullTarget,
   EncodedAudioPacketSource,
@@ -58,6 +64,7 @@ export async function checkSupport(): Promise<string | null> {
 export interface ExportOptions {
   signal: AbortSignal;
   onProgress: (fraction: number, message: string) => void;
+  onPhotoMotion?: (animated: boolean) => void;
 }
 function cancelled(signal: AbortSignal) {
   if (signal.aborted)
@@ -65,7 +72,7 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress }: ExportOptions,
+  { signal, onProgress, onPhotoMotion }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport();
@@ -126,6 +133,7 @@ export async function exportMovie(
       const input =
         cut.asset.kind === "video" ? openInput(cut.asset.file) : null;
       let image: HTMLImageElement | null = null;
+      let photo: PhotoLayers | undefined;
       let url: string | undefined;
       try {
         if (!input) {
@@ -133,6 +141,12 @@ export async function exportMovie(
           image = new Image();
           image.src = url;
           await image.decode();
+          onProgress(
+            elapsed / total,
+            `${index + 1} / ${cuts.length} 写真の人物を確認中`,
+          );
+          photo = await preparePhoto(image);
+          onPhotoMotion?.(!!photo.foreground);
         }
         const track = input ? await input.getPrimaryVideoTrack() : null;
         const base = track ? await track.getFirstTimestamp() : 0;
@@ -163,20 +177,10 @@ export async function exportMovie(
                   `${cut.asset.file.name}: 映像フレームを取得できません。`,
                 );
               ctx.drawImage(next.value.canvas, 0, 0, 1280, 720);
-            } else if (image) {
-              const s = Math.min(
-                1280 / image.naturalWidth,
-                720 / image.naturalHeight,
-              );
-              ctx.drawImage(
-                image,
-                (1280 - image.naturalWidth * s) / 2,
-                (720 - image.naturalHeight * s) / 2,
-                image.naturalWidth * s,
-                image.naturalHeight * s,
-              );
+            } else if (photo) {
+              drawPhoto(ctx, photo, frames > 1 ? f / (frames - 1) : 0);
             }
-            // Phase 1 preserves framing. No synthetic objects or subject deformation.
+            // Fade only at the beginning and end of the complete movie.
             const now = elapsed + f / 30;
             const fade = Math.min(1, now / 0.3, (total - now - 1 / 30) / 0.4);
             if (fade < 1) {
@@ -242,6 +246,7 @@ export async function exportMovie(
         input?.dispose();
         if (url) URL.revokeObjectURL(url);
         if (image) image.src = "";
+        if (photo) releasePhoto(photo);
       }
       elapsed += duration;
     }

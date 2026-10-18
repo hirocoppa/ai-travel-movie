@@ -8,3 +8,5 @@ https://github.com/Vanilagy/mediabunny/tree/v1.61.6/packages/aac-encoder
 https://github.com/FFmpeg/FFmpeg
 AAC extension installed version: 1.61.6; FFmpeg libavcodec version embedded by upstream: 62.23.103.
 The extension README includes the Emscripten/FFmpeg build recipe. Source for the extension is also included in its npm distribution. These source notices apply to the libraries, not to your selected photos or movies.
+Person segmentation: @mediapipe/selfie_segmentation 0.1.1675465747 by Google / MediaPipe, Apache-2.0 (see mediapipe-Apache-2.0.txt).
+Includes the unmodified package's JavaScript/WASM runtime and selfie segmentation TFLite models, served from this application's own vision/ directory. Source: https://github.com/google-ai-edge/mediapipe/tree/master/mediapipe/modules/selfie_segmentation and https://www.npmjs.com/package/@mediapipe/selfie_segmentation/v/0.1.1675465747 .

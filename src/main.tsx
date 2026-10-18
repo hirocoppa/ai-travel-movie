@@ -18,9 +18,12 @@ function App() {
     [error, setError] = useState(""),
     [progress, setProgress] = useState(0),
     [status, setStatus] = useState("");
-  const [result, setResult] = useState<{ url: string; blob: Blob } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    url: string;
+    blob: Blob;
+    animatedPhotos: number;
+    stillPhotos: number;
+  } | null>(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -113,14 +116,25 @@ function App() {
           }
         ).wakeLock?.request("screen");
       } catch {}
+      let animatedPhotos = 0,
+        stillPhotos = 0;
       const blob = await exportMovie(plan, {
+        onPhotoMotion: (animated) => {
+          if (animated) animatedPhotos++;
+          else stillPhotos++;
+        },
         signal: controller.current.signal,
         onProgress: (n, s) => {
           setProgress(n);
           setStatus(s);
         },
       });
-      setResult({ blob, url: URL.createObjectURL(blob) });
+      setResult({
+        blob,
+        url: URL.createObjectURL(blob),
+        animatedPhotos,
+        stillPhotos,
+      });
     } catch (e) {
       setError(
         e instanceof Error
@@ -388,6 +402,13 @@ function App() {
             <h2>旅の映画ができました。</h2>
             <video src={result.url} controls playsInline />
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
+            {result.animatedPhotos + result.stillPhotos > 0 && (
+              <p>
+                写真：背景の動き {result.animatedPhotos}枚 ／ 静止表示{" "}
+                {result.stillPhotos}枚<br />
+                人物を安全に切り分けられない写真は静止表示にしています。
+              </p>
+            )}
             <button className="primary" onClick={share}>
               共有して写真に保存
             </button>
@@ -444,11 +465,11 @@ function App() {
         </div>
       </section>
       <footer>
-        <p>Phase 1 · 基本編集版</p>
+        <p>基本編集版 · 人物写真の背景微動に対応</p>
         <p>
-          AI選別・見どころ抽出・写真の動き・BGM生成は未実装です。
+          AI選別・見どころ抽出・BGM生成は未実装です。
           <br />
-          写真は1秒、動画は冒頭最大4秒。元音声を残してカット編集します。
+          写真は1秒。人物を切り分けられる場合だけ、人物を固定して背景を微細に動かします。難しい写真は静止表示します。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">
