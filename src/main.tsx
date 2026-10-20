@@ -1,6 +1,7 @@
 import { motionStrengths, type PhotoEffect, type MotionStrength } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { TitlePreview } from "./title-preview";
+import { MotionPreview } from "./motion-preview";
 import type { PhotoTitle } from "./title";
 import { moodLabels, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
@@ -33,7 +34,8 @@ function App() {
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
   const [animation, setAnimation] = useState(true);
-  const [motionStrength, setMotionStrength] = useState<MotionStrength>("small");
+  const [motionStrength, setMotionStrength] = useState<MotionStrength>("large");
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -301,6 +303,7 @@ function App() {
         </label>
         <p className="hint">小・中・大で人物と背景の移動量を切り替えます。環境光の変化も強さに連動します。</p>
         <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景も、短い時間で動きが分かるように写真全体を少し移動させ、弱い環境光の変化を加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
+        <p className="hint">写真一覧の「動きをプレビュー」で、書き出す前にアニメーションを確認できます。</p>
         <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
@@ -386,6 +389,15 @@ function App() {
                     </>
                   )}
                 </div>
+                {a.kind === "photo" && !a.error && (
+                  <div style={{ width: "100%", marginTop: 8 }}>
+                    <button className="text-button" type="button" disabled={busy || loading}
+                      onClick={() => setPreviewId(previewId === a.id ? null : a.id)}>
+                      {previewId === a.id ? "プレビューを閉じる" : "▶ 動きをプレビュー"}
+                    </button>
+                    {previewId === a.id && <MotionPreview file={a.file} strength={motionStrength} />}
+                  </div>
+                )}
                 <button
                   className="remove"
                   aria-label={`${a.file.name}を削除`}
