@@ -1,7 +1,6 @@
-import { motionStrengths, type PhotoEffect, type MotionStrength } from "./photo-motion";
+import type { PhotoEffect } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { TitlePreview } from "./title-preview";
-import { MotionPreview } from "./motion-preview";
 import type { PhotoTitle } from "./title";
 import { moodLabels, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
@@ -33,9 +32,6 @@ function App() {
   const [size, setSize] = useState<OutputSize>(defaultOutputSize);
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
-  const [animation, setAnimation] = useState(true);
-  const [motionStrength, setMotionStrength] = useState<MotionStrength>("large");
-  const [previewId, setPreviewId] = useState<string | null>(null);
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -151,8 +147,6 @@ function App() {
       const blob = await exportMovie(plan, {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
-        animation,
-        motionStrength,
         size,
         title,
         onPhotoMotion: (effect) => { photoEffects[effect]++; },
@@ -287,23 +281,8 @@ function App() {
             <option value="2">2秒</option>
           </select>
         </label>
-        <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。動きは最大2秒で落ち着きます。大きなズームやPANは行いません。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
-        <label className="confirmation">
-          <input type="checkbox" checked={animation} disabled={busy || loading}
-            onChange={(e) => { setAnimation(e.target.checked); setResult(null); }} />
-          写真に控えめなアニメーションを付ける
-        </label>
-        <label className="photo-duration">
-          動きの強さ（全写真共通）
-          <select value={motionStrength} disabled={busy || loading || !animation}
-            onChange={(e) => { setMotionStrength(e.target.value as MotionStrength); setResult(null); }}>
-            {(["large", "medium", "small"] as const).map((strength) =>
-              <option key={strength} value={strength}>{motionStrengths[strength].label}</option>)}
-          </select>
-        </label>
-        <p className="hint">小・中・大で人物と背景の移動量を切り替えます。環境光の変化も強さに連動します。</p>
-        <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景も、短い時間で動きが分かるように写真全体を少し移動させ、弱い環境光の変化を加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
-        <p className="hint">写真一覧の「動きをプレビュー」で、書き出す前にアニメーションを確認できます。</p>
+        <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。写真の表示時間全体でPAN・ZOOMを行います。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
+        <p className="hint">写真ごとに異なるPAN・ZOOMを自動で組み合わせます。移動方向・拡大縮小・速度を変え、単調な繰り返しを避けます。写真は端末から送信しません。</p>
         <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
@@ -389,15 +368,6 @@ function App() {
                     </>
                   )}
                 </div>
-                {a.kind === "photo" && !a.error && (
-                  <div style={{ width: "100%", marginTop: 8 }}>
-                    <button className="text-button" type="button" disabled={busy || loading}
-                      onClick={() => setPreviewId(previewId === a.id ? null : a.id)}>
-                      {previewId === a.id ? "プレビューを閉じる" : "▶ 動きをプレビュー"}
-                    </button>
-                    {previewId === a.id && <MotionPreview file={a.file} strength={motionStrength} />}
-                  </div>
-                )}
                 <button
                   className="remove"
                   aria-label={`${a.file.name}を削除`}
@@ -508,7 +478,7 @@ function App() {
             <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（写真の色合いから自動選択）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {Object.values(result.photoEffects).some((count) => count > 0) && (
-              <p>写真：人物の立体演出 {result.photoEffects.parallax}枚 ／ 環境光の変化 {result.photoEffects.light}枚 ／ 静止 {result.photoEffects.still}枚</p>
+              <p>写真：自動PAN・ZOOM {result.photoEffects.light}枚</p>
             )}
             <button className="primary" onClick={share}>
               共有して写真に保存
@@ -566,11 +536,11 @@ function App() {
         </div>
       </section>
       <footer>
-        <p>基本編集版 · 控えめな写真アニメーションに対応</p>
+        <p>基本編集版 · 写真ごとの自動PAN・ZOOMに対応</p>
         <p>
           無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
-          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真は人物の立体演出、または環境光の変化を自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
+          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真には異なる方向・速度のPAN・ZOOMを自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">
