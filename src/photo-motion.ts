@@ -51,7 +51,8 @@ export function animationProgress(seconds: number, duration = 2) {
 }
 export function drawPhoto(ctx: CanvasRenderingContext2D, layers: PhotoLayers, progress: number) {
   const p = Math.max(0, Math.min(1, progress));
-  const eased = p * p * (3 - 2 * p);
+  // Linear progress keeps PAN and ZOOM at a constant rate from start to finish.
+  const eased = p;
   const m = layers.move;
   const zoom = m.fromZoom + (m.toZoom - m.fromZoom) * eased;
   const x = m.fromX + (m.toX - m.fromX) * eased;
