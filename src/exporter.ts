@@ -7,6 +7,7 @@ import {
   releasePhoto,
   type PhotoLayers,
   type PhotoEffect,
+  type MotionStrength,
   animationProgress,
 } from "./photo-motion";
 import {
@@ -68,6 +69,7 @@ export interface ExportOptions {
   size?: OutputSize;
   title?: PhotoTitle;
   animation?: boolean;
+  motionStrength?: MotionStrength;
   bgm?: boolean;
   onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
@@ -80,7 +82,7 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, animation = true, size = defaultOutputSize, title }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, animation = true, motionStrength = "small", size = defaultOutputSize, title }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport(size);
@@ -176,7 +178,7 @@ export async function exportMovie(
             elapsed / total,
             `${index + 1} / ${cuts.length} 写真の動きを準備中`,
           );
-          photo = await preparePhoto(image, width, height, { animate: animation, signal });
+          photo = await preparePhoto(image, width, height, { animate: animation, signal, strength: motionStrength });
           onPhotoMotion?.(photo.effect);
         }
         const track = input ? await input.getPrimaryVideoTrack() : null;

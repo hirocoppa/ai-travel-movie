@@ -60,6 +60,7 @@ test(`mobile: ${photoDuration}s photos, chronological editing, original audio an
   });
   await page.goto("/");
   await page.getByLabel("出力サイズ").selectOption(`${width}x${height}`);
+  await page.getByLabel("動きの強さ（全写真共通）").selectOption(({ 1920: "small", 1280: "medium", 960: "large" } as Record<number, string>)[width]);
   await page.getByLabel("写真の表示時間（全体共通）").selectOption(String(photoDuration));
 
   await page.locator("input[type=file]").setInputFiles([photo, video]);

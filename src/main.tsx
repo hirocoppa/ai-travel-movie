@@ -1,4 +1,4 @@
-import type { PhotoEffect } from "./photo-motion";
+import { motionStrengths, type PhotoEffect, type MotionStrength } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { TitlePreview } from "./title-preview";
 import type { PhotoTitle } from "./title";
@@ -33,6 +33,7 @@ function App() {
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
   const [animation, setAnimation] = useState(true);
+  const [motionStrength, setMotionStrength] = useState<MotionStrength>("small");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -149,6 +150,7 @@ function App() {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
         animation,
+        motionStrength,
         size,
         title,
         onPhotoMotion: (effect) => { photoEffects[effect]++; },
@@ -289,6 +291,15 @@ function App() {
             onChange={(e) => { setAnimation(e.target.checked); setResult(null); }} />
           写真に控えめなアニメーションを付ける
         </label>
+        <label className="photo-duration">
+          動きの強さ（全写真共通）
+          <select value={motionStrength} disabled={busy || loading || !animation}
+            onChange={(e) => { setMotionStrength(e.target.value as MotionStrength); setResult(null); }}>
+            {(["large", "medium", "small"] as const).map((strength) =>
+              <option key={strength} value={strength}>{motionStrengths[strength].label}</option>)}
+          </select>
+        </label>
+        <p className="hint">小は以前の約2倍、中は約3倍、大は約4倍の移動量です。光の演出も移動量と明るさが変わります。</p>
         <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景は、変形させずに光のゆらぎを加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
         <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}

@@ -5,11 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 const person = readFileSync("tests/fixtures/astronaut.png").toString("base64");
 
-test("real person: visible layer movement preserves rigid person pixels, covers the frame and exports MP4 locally", async ({ page }) => {
+for (const strength of ["small", "medium", "large"] as const) {
+test(`real person ${strength}: visible layer movement preserves rigid person pixels, covers the frame and exports MP4 locally`, async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.goto("/");
-  const result = await page.evaluate(async (data) => {
+  const result = await page.evaluate(async ({ data, strength }) => {
     const { preparePhoto, drawPhoto, releasePhoto } = await import("/src/photo-motion.ts");
     const { exportMovie } = await import("/src/exporter.ts");
     const original = new Image(); original.src = "data:image/png;base64," + data; await original.decode();
@@ -20,7 +21,7 @@ test("real person: visible layer movement preserves rigid person pixels, covers 
     c.drawImage(original, 280, 0, 720, 720);
     const blob = await new Promise<Blob>((resolve) => composition.toBlob((value) => resolve(value!)));
     const image = new Image(); image.src = URL.createObjectURL(blob); await image.decode();
-    const layers = await preparePhoto(image);
+    const layers = await preparePhoto(image, 1280, 720, { strength });
     const canvas = document.createElement("canvas"); canvas.width = 1280; canvas.height = 720;
     const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     const frames: Uint8ClampedArray[] = [];
@@ -32,26 +33,27 @@ test("real person: visible layer movement preserves rigid person pixels, covers 
       for (let i = 0; i < pixels.length; i += 4)
         if (pixels[i] === 255 && pixels[i + 1] === 0 && pixels[i + 2] === 255) uncovered++;
     }
+    const shift = { small: 2, medium: 3, large: 4 }[strength];
     let changed = 0, protectedPixels = 0, protectedChanges = 0;
     const alpha = layers.foreground?.getContext("2d")!.getImageData(0, 0, 1280, 720).data;
-    for (let y = 2; y < 718; y++) for (let x = 3; x < 1277; x++) {
+    for (let y = 2; y < 718; y++) for (let x = 8; x < 1272; x++) {
       const i = (y * 1280 + x) * 4;
       if (frames[0][i] !== frames[2][i] || frames[0][i + 1] !== frames[2][i + 1]) changed++;
       if (alpha && alpha[i + 3] === 255 && alpha[i - 4 + 3] === 255 && alpha[i + 4 + 3] === 255) {
         protectedPixels++;
-        // At 720p the foreground translates exactly +1px -> -1px. Its pixels
+        // At 720p foreground endpoints are whole-pixel translations. Its pixels
         // must match after registration: no face warping, bending or regeneration.
-        if ([0, 1, 2].some((channel) => frames[0][i + 4 + channel] !== frames[2][i - 4 + channel])) protectedChanges++;
+        if ([0, 1, 2].some((channel) => frames[0][i + shift * 4 + channel] !== frames[2][i - shift * 4 + channel])) protectedChanges++;
       }
     }
     const effect = layers.effect; releasePhoto(layers); URL.revokeObjectURL(image.src);
     const file = new File([blob], "person.png", { type: "image/png" });
     const effects: string[] = [];
     const movie = await exportMovie([{ asset: { id: "p", file, kind: "photo", duration: 2, date: 1, confirmed: true, dateSource: "test" }, start: 0, duration: 2, capturedAt: 1 }], {
-      signal: new AbortController().signal, onProgress: () => {}, onPhotoMotion: (value) => effects.push(value), size: "960x540",
+      signal: new AbortController().signal, onProgress: () => {}, onPhotoMotion: (value) => effects.push(value), size: "960x540", motionStrength: strength,
     });
     return { effect, changed, protectedPixels, protectedChanges, uncovered, effects, bytes: Array.from(new Uint8Array(await movie.arrayBuffer())) };
-  }, person);
+  }, { data: person, strength });
   expect(result.effect).toBe("parallax");
   expect(result.changed).toBeGreaterThan(10000);
   expect(result.protectedPixels).toBeGreaterThan(10000);
@@ -68,9 +70,12 @@ test("real person: visible layer movement preserves rigid person pixels, covers 
   expect(requests.filter((url) => /^https?:/.test(url) && !url.startsWith("http://127.0.0.1:5173"))).toEqual([]);
 });
 
-test("landscape uses visible gentle light, not a claim of moving water or clouds", async ({ page }) => {
+}
+
+for (const strength of ["small", "medium", "large"] as const) {
+test(`landscape ${strength} uses visible gentle light, not a claim of moving water or clouds`, async ({ page }) => {
   await page.goto("/");
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (strength) => {
     const { preparePhoto, drawPhoto, releasePhoto } = await import("/src/photo-motion.ts");
     const source = document.createElement("canvas"); source.width = 800; source.height = 450;
     const s = source.getContext("2d")!;
@@ -78,7 +83,7 @@ test("landscape uses visible gentle light, not a claim of moving water or clouds
     s.fillStyle = sky; s.fillRect(0, 0, 800, 450); s.fillStyle = "#355e45";
     s.beginPath(); s.moveTo(0, 450); s.lineTo(160, 160); s.lineTo(420, 380); s.lineTo(650, 180); s.lineTo(800, 450); s.fill();
     const image = new Image(); image.src = source.toDataURL(); await image.decode();
-    const layers = await preparePhoto(image, 960, 540);
+    const layers = await preparePhoto(image, 960, 540, { strength });
     const canvas = document.createElement("canvas"); canvas.width = 960; canvas.height = 540;
     const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     drawPhoto(ctx, layers, 0); const before = ctx.getImageData(0, 0, 960, 540).data;
@@ -90,11 +95,13 @@ test("landscape uses visible gentle light, not a claim of moving water or clouds
     }
     const effect = layers.effect; releasePhoto(layers);
     return { effect, changed, maxChange };
-  });
+  }, strength);
   expect(result.effect).toBe("light");
   expect(result.changed).toBeGreaterThan(10000);
-  expect(result.maxChange).toBeLessThanOrEqual(22);
+  expect(result.maxChange).toBeLessThanOrEqual({ small: 44, medium: 66, large: 88 }[strength]);
 });
+
+}
 
 for (const failure of ["network", "webgl", "timeout"] as const) {
   test(`person model ${failure} failure falls back to light and keeps exporting`, async ({ page }) => {

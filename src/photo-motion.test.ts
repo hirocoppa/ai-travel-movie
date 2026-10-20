@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { outputSizes } from "./output-settings";
-import { photoFrame, reliablePersonMask, animationProgress } from "./photo-motion";
+import { photoFrame, reliablePersonMask, animationProgress, motionSettings, motionStrengths } from "./photo-motion";
 describe("safe photo animation", () => {
   for (const [width, height] of [[480, 640], [1920, 1080], [3000, 500], [500, 3000], [512, 512]]) {
     it(`covers output sizes without stretching a ${width}×${height} photo`, () => {
@@ -31,5 +31,25 @@ describe("safe photo animation", () => {
     }
     expect(animationProgress(2, 3)).toBe(1);
     expect(animationProgress(3, 3)).toBe(1);
+  });
+});
+
+
+describe("three motion strengths", () => {
+  it("starts at twice the previous movement and increases monotonically", () => {
+    const stages = ["small", "medium", "large"] as const;
+    expect(stages.map((stage) => motionStrengths[stage].multiplier)).toEqual([2, 3, 4]);
+    expect(stages.map((stage) => motionSettings(stage, 1280, 720).backgroundX * 2)).toEqual([20, 30, 40]);
+    expect(stages.map((stage) => motionSettings(stage, 1280, 720).foregroundX * 2)).toEqual([4, 6, 8]);
+  });
+  it("keeps background coverage and person protection for every size and strength", () => {
+    for (const stage of ["small", "medium", "large"] as const) {
+      for (const { width, height } of Object.values(outputSizes)) {
+        const s = motionSettings(stage, width, height);
+        expect(width * (s.zoom - 1) / 2).toBeGreaterThan(s.backgroundX);
+        expect(height * (s.zoom - 1) / 2).toBeGreaterThan(s.backgroundY);
+        expect(s.margin).toBeGreaterThan(width * (s.zoom - 1) / 2 + s.backgroundX + s.foregroundX);
+      }
+    }
   });
 });
