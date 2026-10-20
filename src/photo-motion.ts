@@ -16,26 +16,24 @@ function random(seed: number) {
   };
 }
 export function cameraMove(index: number, seed = 0): CameraMove {
+  // One simple, constant-speed move per cut: horizontal/vertical PAN or ZOOM.
+  // Never combine pan and zoom, and never use diagonal or easing.
   const rnd = random((seed ^ Math.imul(index + 1, 2654435761)) >>> 0);
-  // Mix left/right/up/down pans, zoom-in, zoom-out, and diagonals.
-  // Offset the pattern by index so adjacent cuts rarely have the same motion.
-  const kind = (Math.floor(rnd() * 7) + index * 3) % 7;
-  const strength = (0.035 + rnd() * 0.045) * 0.5;
-  const diagonal = 0.35 + rnd() * 0.4;
-  const signs: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1],
-    [-diagonal, -diagonal], [diagonal, diagonal], [0, 0]];
-  const [dx, dy] = signs[kind];
-  const zoomBase = 1.10 + rnd() * 0.05;
-  const zoomDelta = (0.045 + rnd() * 0.055) * 0.5;
-  const zoomIn = kind === 6 || (kind < 4 && rnd() > 0.6);
-  const zoomOut = !zoomIn && rnd() > 0.7;
-  const fromZoom = zoomOut ? zoomBase + zoomDelta : zoomBase;
-  const toZoom = zoomIn ? zoomBase + zoomDelta : zoomOut ? zoomBase : zoomBase + rnd() * 0.009;
-  const jitterX = (rnd() - 0.5) * 0.012;
-  const jitterY = (rnd() - 0.5) * 0.012;
-  return { kind, fromX: jitterX - dx * strength / 2, toX: jitterX + dx * strength / 2,
-    fromY: jitterY - dy * strength / 2, toY: jitterY + dy * strength / 2,
-    fromZoom, toZoom };
+  const kind = (index + Math.floor(rnd() * 4)) % 4;
+  const baseZoom = 1.12;
+  const panDistance = 0.026; // Gentle, fixed travel for every pan.
+  const zoomDistance = 0.024; // Gentle, fixed travel for every zoom.
+  const direction = rnd() < 0.5 ? -1 : 1;
+  if (kind === 0)
+    return { kind, fromX: -direction * panDistance / 2, toX: direction * panDistance / 2,
+      fromY: 0, toY: 0, fromZoom: baseZoom, toZoom: baseZoom };
+  if (kind === 1)
+    return { kind, fromX: 0, toX: 0, fromY: -direction * panDistance / 2,
+      toY: direction * panDistance / 2, fromZoom: baseZoom, toZoom: baseZoom };
+  const zoomIn = kind === 2;
+  return { kind, fromX: 0, toX: 0, fromY: 0, toY: 0,
+    fromZoom: zoomIn ? baseZoom : baseZoom + zoomDistance,
+    toZoom: zoomIn ? baseZoom + zoomDistance : baseZoom };
 }
 export async function preparePhoto(image: HTMLImageElement, outputWidth = 1280, outputHeight = 720,
   options: { signal?: AbortSignal; index?: number; seed?: number } = {}): Promise<PhotoLayers> {
@@ -52,11 +50,10 @@ export function animationProgress(seconds: number, duration = 2) {
 export function drawPhoto(ctx: CanvasRenderingContext2D, layers: PhotoLayers, progress: number) {
   const p = Math.max(0, Math.min(1, progress));
   // Linear progress keeps PAN and ZOOM at a constant rate from start to finish.
-  const eased = p;
   const m = layers.move;
-  const zoom = m.fromZoom + (m.toZoom - m.fromZoom) * eased;
-  const x = m.fromX + (m.toX - m.fromX) * eased;
-  const y = m.fromY + (m.toY - m.fromY) * eased;
+  const zoom = m.fromZoom + (m.toZoom - m.fromZoom) * p;
+  const x = m.fromX + (m.toX - m.fromX) * p;
+  const y = m.fromY + (m.toY - m.fromY) * p;
   const { width, height } = ctx.canvas;
   ctx.save();
   ctx.translate(width / 2 + x * width, height / 2 + y * height);
