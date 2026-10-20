@@ -32,7 +32,7 @@ function App() {
   const [size, setSize] = useState<OutputSize>(defaultOutputSize);
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
-  const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
+  const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1.5);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
