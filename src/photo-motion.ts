@@ -20,17 +20,17 @@ export function cameraMove(index: number, seed = 0): CameraMove {
   // Mix left/right/up/down pans, zoom-in, zoom-out, and diagonals.
   // Offset the pattern by index so adjacent cuts rarely have the same motion.
   const kind = (Math.floor(rnd() * 7) + index * 3) % 7;
-  const strength = 0.035 + rnd() * 0.045;
+  const strength = (0.035 + rnd() * 0.045) * 0.5;
   const diagonal = 0.35 + rnd() * 0.4;
   const signs: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1],
     [-diagonal, -diagonal], [diagonal, diagonal], [0, 0]];
   const [dx, dy] = signs[kind];
   const zoomBase = 1.10 + rnd() * 0.05;
-  const zoomDelta = 0.045 + rnd() * 0.055;
+  const zoomDelta = (0.045 + rnd() * 0.055) * 0.5;
   const zoomIn = kind === 6 || (kind < 4 && rnd() > 0.6);
   const zoomOut = !zoomIn && rnd() > 0.7;
   const fromZoom = zoomOut ? zoomBase + zoomDelta : zoomBase;
-  const toZoom = zoomIn ? zoomBase + zoomDelta : zoomOut ? zoomBase : zoomBase + rnd() * 0.018;
+  const toZoom = zoomIn ? zoomBase + zoomDelta : zoomOut ? zoomBase : zoomBase + rnd() * 0.009;
   const jitterX = (rnd() - 0.5) * 0.012;
   const jitterY = (rnd() - 0.5) * 0.012;
   return { kind, fromX: jitterX - dx * strength / 2, toX: jitterX + dx * strength / 2,
