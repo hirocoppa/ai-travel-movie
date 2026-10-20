@@ -299,8 +299,8 @@ function App() {
               <option key={strength} value={strength}>{motionStrengths[strength].label}</option>)}
           </select>
         </label>
-        <p className="hint">小は以前の約2倍、中は約3倍、大は約4倍の移動量です。光の演出も移動量と明るさが変わります。</p>
-        <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景は、変形させずに光のゆらぎを加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
+        <p className="hint">小・中・大で人物と背景の移動量を切り替えます。環境光の変化も強さに連動します。</p>
+        <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景は、画像の明るさに応じて弱い環境光の変化を加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
         <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
@@ -496,7 +496,7 @@ function App() {
             <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（写真の色合いから自動選択）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {Object.values(result.photoEffects).some((count) => count > 0) && (
-              <p>写真：人物の立体演出 {result.photoEffects.parallax}枚 ／ 光のゆらぎ {result.photoEffects.light}枚 ／ 静止 {result.photoEffects.still}枚</p>
+              <p>写真：人物の立体演出 {result.photoEffects.parallax}枚 ／ 環境光の変化 {result.photoEffects.light}枚 ／ 静止 {result.photoEffects.still}枚</p>
             )}
             <button className="primary" onClick={share}>
               共有して写真に保存
@@ -558,7 +558,7 @@ function App() {
         <p>
           無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
-          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真は人物の立体演出、または光のゆらぎを自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
+          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真は人物の立体演出、または環境光の変化を自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">

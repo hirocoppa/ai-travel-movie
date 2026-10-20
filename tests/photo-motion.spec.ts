@@ -35,7 +35,7 @@ test(`real person ${strength}: visible layer movement preserves rigid person pix
     }
     const shift = { small: 2, medium: 3, large: 4 }[strength];
     let changed = 0, protectedPixels = 0, protectedChanges = 0;
-    const alpha = layers.foreground?.getContext("2d")!.getImageData(0, 0, 1280, 720).data;
+    const alpha = layers.foreground?.getContext("2d")!.getImageData(layers.insetX, layers.insetY, 1280, 720).data;
     for (let y = 2; y < 718; y++) for (let x = 8; x < 1272; x++) {
       const i = (y * 1280 + x) * 4;
       if (frames[0][i] !== frames[2][i] || frames[0][i + 1] !== frames[2][i + 1]) changed++;
@@ -87,18 +87,21 @@ test(`landscape ${strength} uses visible gentle light, not a claim of moving wat
     const canvas = document.createElement("canvas"); canvas.width = 960; canvas.height = 540;
     const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
     drawPhoto(ctx, layers, 0); const before = ctx.getImageData(0, 0, 960, 540).data;
-    drawPhoto(ctx, layers, 1); const after = ctx.getImageData(0, 0, 960, 540).data;
-    let changed = 0, maxChange = 0;
+    drawPhoto(ctx, layers, 0.5); const after = ctx.getImageData(0, 0, 960, 540).data;
+    drawPhoto(ctx, layers, 1); const end = ctx.getImageData(0, 0, 960, 540).data;
+    let changed = 0, maxChange = 0, endChanges = 0;
     for (let i = 0; i < before.length; i += 4) {
       const delta = Math.abs(before[i] - after[i]);
       if (delta > 2) changed++; maxChange = Math.max(maxChange, delta);
+      if (before[i] !== end[i]) endChanges++;
     }
     const effect = layers.effect; releasePhoto(layers);
-    return { effect, changed, maxChange };
+    return { effect, changed, maxChange, endChanges };
   }, strength);
   expect(result.effect).toBe("light");
   expect(result.changed).toBeGreaterThan(10000);
-  expect(result.maxChange).toBeLessThanOrEqual({ small: 44, medium: 66, large: 88 }[strength]);
+  expect(result.maxChange).toBeLessThanOrEqual(22);
+  expect(result.endChanges).toBe(0);
 });
 
 }

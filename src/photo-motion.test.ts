@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { outputSizes } from "./output-settings";
-import { photoFrame, reliablePersonMask, animationProgress, motionSettings, motionStrengths } from "./photo-motion";
+import { photoFrame, reliablePersonMask, animationProgress, motionSettings, motionStrengths, protectedAlpha } from "./photo-motion";
 describe("safe photo animation", () => {
   for (const [width, height] of [[480, 640], [1920, 1080], [3000, 500], [500, 3000], [512, 512]]) {
     it(`covers output sizes without stretching a ${width}×${height} photo`, () => {
@@ -46,10 +46,25 @@ describe("three motion strengths", () => {
     for (const stage of ["small", "medium", "large"] as const) {
       for (const { width, height } of Object.values(outputSizes)) {
         const s = motionSettings(stage, width, height);
-        expect(width * (s.zoom - 1) / 2).toBeGreaterThan(s.backgroundX);
-        expect(height * (s.zoom - 1) / 2).toBeGreaterThan(s.backgroundY);
-        expect(s.margin).toBeGreaterThan(width * (s.zoom - 1) / 2 + s.backgroundX + s.foregroundX);
+        expect(s.borderX).toBeGreaterThan(s.backgroundX);
+        expect(s.borderY).toBeGreaterThan(s.backgroundY);
+        expect(s.margin).toBeGreaterThan(s.backgroundX + s.foregroundX);
       }
     }
   });
+});
+
+
+it("protects continuously around the silhouette and feathers only outside its safety band", () => {
+  const values = new Float32Array(256 * 256); values[128 * 256 + 128] = 1;
+  const alpha = protectedAlpha(values, 256, 256, 4, 8);
+  const row = (x: number) => alpha[128 * 256 + x];
+  for (let x = 128; x <= 132; x++) expect(row(x)).toBe(255);
+  for (let x = 133; x < 140; x++) { expect(row(x)).toBeLessThan(row(x - 1)); expect(row(x)).toBeGreaterThan(0); }
+  expect(row(140)).toBe(0);
+});
+it("rejects fragmented masks instead of animating disconnected patches", () => {
+  const values = new Float32Array(256 * 256);
+  for (let y = 0; y < 256; y += 3) for (let x = 0; x < 256; x += 3) values[y * 256 + x] = 1;
+  expect(reliablePersonMask(values)).toBe(false);
 });
