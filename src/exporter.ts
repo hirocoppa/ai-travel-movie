@@ -1,6 +1,6 @@
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { drawPhotoTitle, type PhotoTitle } from "./title";
-import { mixBgm, chooseMusicMood, type MusicMood, type AudioRegion } from "./music";
+import { mixBgm, chooseMusicMood, newMusicSeed, type MusicMood, type AudioRegion } from "./music";
 import {
   preparePhoto,
   drawPhoto,
@@ -85,6 +85,7 @@ export async function exportMovie(
   const unsupported = await checkSupport(size);
   if (unsupported) throw new Error(unsupported);
   let musicMood: MusicMood = "bright";
+  const musicSeed = newMusicSeed();
   if (bgm) {
     onProgress(0, "写真の色合いからBGMの雰囲気を選んでいます");
     musicMood = await chooseMusicMood(cuts.filter((c) => c.asset.kind === "photo").map((c) => c.asset.file), signal);
@@ -210,7 +211,7 @@ export async function exportMovie(
             } else if (photo) {
               drawPhoto(ctx, photo, animationProgress(f / 30, duration));
             }
-            if (cut === firstPhoto && f < 60 && title) drawPhotoTitle(ctx, title);
+            if (index === 0 && cut === firstPhoto && title) drawPhotoTitle(ctx, title);
             // Fade only at the beginning and end of the complete movie.
             const now = elapsed + f / 30;
             const fade = Math.min(1, now / 0.3, (total - now - 1 / 30) / 0.4);
@@ -272,7 +273,7 @@ export async function exportMovie(
         cancelled(signal);
         const rendered = await offline.startRendering();
         cancelled(signal);
-        if (bgm) mixBgm(rendered, elapsed, total, originalAudio, musicMood);
+        if (bgm) mixBgm(rendered, elapsed, total, originalAudio, musicMood, musicSeed);
         await audio.add(rendered);
         await audioDrain;
         if (audioError) throw audioError;
