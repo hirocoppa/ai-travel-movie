@@ -46,16 +46,31 @@ const melody = [72, 76, 79, 76, 74, 71, 67, 71, 72, 76, 81, 79, 77, 76, 72, 69];
 const frequency = (note: number) => 440 * 2 ** ((note - 69) / 12);
 const tone = (note: number, t: number) => Math.sin(2 * Math.PI * frequency(note) * t);
 export const musicTempo = (mood: MusicMood) => mood === "bright" ? 112 : mood === "warm" ? 104 : 108;
-function chordAt(t: number, beat: number) {
-  return chords[Math.floor(Math.max(0, t) / (beat * 4)) % chords.length];
+// A fresh seed is generated once per export; the same seed is used for every audio chunk.
+export function newMusicSeed(): number {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return bytes[0];
 }
-export function musicSample(t: number, mood: MusicMood = "bright"): number {
+function musicVariation(seed: number) {
+  const shift = seed % 5 - 2;
+  const rotation = (seed >>> 4) % melody.length;
+  const chordRotation = (seed >>> 9) % chords.length;
+  const tempoOffset = ((seed >>> 13) % 5 - 2) * 3;
+  const pluckMix = 0.8 + ((seed >>> 17) % 5) * 0.1;
+  return { shift, rotation, chordRotation, tempoOffset, pluckMix };
+}
+function chordAt(t: number, beat: number, rotation = 0) {
+  return chords[(Math.floor(Math.max(0, t) / (beat * 4)) + rotation) % chords.length];
+}
+export function musicSample(t: number, mood: MusicMood = "bright", seed = 0): number {
   // Major harmony and a lively rhythm in every mood; tempo never changes pitch.
-  const beat = 60 / musicTempo(mood);
+  const variation = musicVariation(seed);
+  const beat = 60 / (musicTempo(mood) + variation.tempoOffset);
   const bar = beat * 4;
   const local = t % bar;
-  const current = chordAt(t, beat);
-  const previous = chordAt(Math.max(0, t - bar), beat);
+  const current = chordAt(t, beat, variation.chordRotation);
+  const previous = chordAt(Math.max(0, t - bar), beat, variation.chordRotation);
   const blend = Math.min(1, local / 0.18);
   let pad = 0;
   for (let i = 0; i < 4; i++)
@@ -64,8 +79,8 @@ export function musicSample(t: number, mood: MusicMood = "bright"): number {
   const noteTime = t % beat;
   // Soft bell/pluck, with an attack to avoid clicks at note boundaries.
   const envelope = Math.min(1, noteTime / 0.012) * Math.exp(-noteTime * 5);
-  const note = melody[step % melody.length];
-  const pluck = (tone(note, noteTime) + 0.18 * tone(note + 12, noteTime)) * envelope * 0.24;
+  const note = melody[(step + variation.rotation) % melody.length] + variation.shift;
+  const pluck = (tone(note, noteTime) + 0.18 * tone(note + 12, noteTime)) * envelope * 0.24 * variation.pluckMix;
   const eighth = beat / 2;
   const arpeggioTime = t % eighth;
   const arpeggioNote = current[Math.floor(t / eighth) % current.length] + 12;
@@ -80,6 +95,7 @@ export function mixBgm(
   total: number,
   originalAudio: AudioRegion[],
   mood: MusicMood = "bright",
+  seed = 0,
 ) {
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
   const nearby = originalAudio.filter((r) => r.end + 0.2 >= start && r.start - 0.2 <= start + buffer.duration);
@@ -90,7 +106,7 @@ export function mixBgm(
     let duck = 0;
     for (const region of nearby)
       duck = Math.max(duck, Math.max(0, Math.min(1, (t - region.start + 0.2) / 0.2, (region.end + 0.2 - t) / 0.2)));
-    const music = musicSample(t, mood) * 0.9 * (1 - 0.7 * duck) * fade;
+    const music = musicSample(t, mood, seed) * 0.9 * (1 - 0.7 * duck) * fade;
     for (const channel of channels) {
       const mixed = channel[i] * 0.8 + music;
       // Smoothly limit only peaks; normal-level original sound remains linear.
