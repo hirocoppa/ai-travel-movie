@@ -6,6 +6,8 @@ import {
   drawPhoto,
   releasePhoto,
   type PhotoLayers,
+  type PhotoEffect,
+  animationProgress,
 } from "./photo-motion";
 import {
   Output,
@@ -65,11 +67,12 @@ export async function checkSupport(size: OutputSize = defaultOutputSize): Promis
 export interface ExportOptions {
   size?: OutputSize;
   title?: PhotoTitle;
+  animation?: boolean;
   bgm?: boolean;
   onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
   onProgress: (fraction: number, message: string) => void;
-  onPhotoMotion?: (animated: boolean) => void;
+  onPhotoMotion?: (effect: PhotoEffect) => void;
 }
 function cancelled(signal: AbortSignal) {
   if (signal.aborted)
@@ -77,7 +80,7 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, size = defaultOutputSize, title }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, animation = true, size = defaultOutputSize, title }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport(size);
@@ -173,8 +176,8 @@ export async function exportMovie(
             elapsed / total,
             `${index + 1} / ${cuts.length} 写真の動きを準備中`,
           );
-          photo = await preparePhoto(image, width, height);
-          onPhotoMotion?.(true);
+          photo = await preparePhoto(image, width, height, { animate: animation, signal });
+          onPhotoMotion?.(photo.effect);
         }
         const track = input ? await input.getPrimaryVideoTrack() : null;
         const base = track ? await track.getFirstTimestamp() : 0;
@@ -206,7 +209,7 @@ export async function exportMovie(
                 );
               ctx.drawImage(next.value.canvas, 0, 0, width, height);
             } else if (photo) {
-              drawPhoto(ctx, photo, frames > 1 ? f / (frames - 1) : 0);
+              drawPhoto(ctx, photo, animationProgress(f / 30, duration));
             }
             if (cut === firstPhoto && f < 60 && title) drawPhotoTitle(ctx, title);
             // Fade only at the beginning and end of the complete movie.

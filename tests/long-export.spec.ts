@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 test("180-second export has exact audiovisual duration", async ({ page }) => {
@@ -19,7 +19,7 @@ test("180-second export has exact audiovisual duration", async ({ page }) => {
     photo,
   ]);
   await page.goto("/");
-  const bytes = await page.evaluate(async (base64) => {
+  const url = await page.evaluate(async (base64) => {
     // Load the production export module through Vite. Test-only generated files
     // exercise the full encoder without requiring 180 private travel photos.
     const { exportMovie } = await import("/src/exporter.ts");
@@ -38,10 +38,19 @@ test("180-second export has exact audiovisual duration", async ({ page }) => {
       signal: new AbortController().signal,
       onProgress: () => {},
     });
-    return Array.from(new Uint8Array(await blob.arrayBuffer()));
+    return URL.createObjectURL(blob);
   }, readFileSync(photo).toString("base64"));
   const output = join(dir, "180.mp4");
-  writeFileSync(output, new Uint8Array(bytes));
+  // Stream the actual download. Serializing a long MP4 as a JSON number array
+  // can exhaust the test runner's heap even though the browser export succeeds.
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.evaluate((href) => {
+      const link = document.createElement("a"); link.href = href; link.download = "180.mp4"; link.click();
+    }, url),
+  ]);
+  await download.saveAs(output);
+  await page.evaluate((href) => URL.revokeObjectURL(href), url);
   const probe = JSON.parse(
     execFileSync(
       "ffprobe",

@@ -1,3 +1,4 @@
+import type { PhotoEffect } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { TitlePreview } from "./title-preview";
 import type { PhotoTitle } from "./title";
@@ -26,12 +27,12 @@ function App() {
     url: string;
     blob: Blob;
     musicMood?: MusicMood;
-    animatedPhotos: number;
-    stillPhotos: number;
+    photoEffects: Record<PhotoEffect, number>;
   } | null>(null);
   const [size, setSize] = useState<OutputSize>(defaultOutputSize);
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
+  const [animation, setAnimation] = useState(true);
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
@@ -142,18 +143,15 @@ function App() {
           }
         ).wakeLock?.request("screen");
       } catch {}
-      let animatedPhotos = 0,
-        stillPhotos = 0;
+      const photoEffects: Record<PhotoEffect, number> = { parallax: 0, light: 0, still: 0 };
       let musicMood: MusicMood | undefined;
       const blob = await exportMovie(plan, {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
+        animation,
         size,
         title,
-        onPhotoMotion: (animated) => {
-          if (animated) animatedPhotos++;
-          else stillPhotos++;
-        },
+        onPhotoMotion: (effect) => { photoEffects[effect]++; },
         signal: controller.current.signal,
         onProgress: (n, s) => {
           setProgress(n);
@@ -164,8 +162,7 @@ function App() {
         blob,
         musicMood,
         url: URL.createObjectURL(blob),
-        animatedPhotos,
-        stillPhotos,
+        photoEffects,
       });
     } catch (e) {
       setError(
@@ -286,7 +283,13 @@ function App() {
             <option value="2">2秒</option>
           </select>
         </label>
-        <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。写真全体にゆっくりしたズームやPANをランダムに付けます。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
+        <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。動きは最大2秒で落ち着きます。大きなズームやPANは行いません。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
+        <label className="confirmation">
+          <input type="checkbox" checked={animation} disabled={busy || loading}
+            onChange={(e) => { setAnimation(e.target.checked); setResult(null); }} />
+          写真に控えめなアニメーションを付ける
+        </label>
+        <p className="hint">人物を推定できる写真は、人物と背景を少しずつ別に動かします。分離が難しい写真や風景は、変形させずに光のゆらぎを加えます。水面・雲を認識して動かす機能ではありません。モデルはこのサイトから読み込み、写真は送信しません。</p>
         <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
@@ -481,10 +484,8 @@ function App() {
             <video src={result.url} controls playsInline />
             <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（写真の色合いから自動選択）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
-            {result.animatedPhotos + result.stillPhotos > 0 && (
-              <p>
-                写真：ズーム・PAN {result.animatedPhotos}枚
-              </p>
+            {Object.values(result.photoEffects).some((count) => count > 0) && (
+              <p>写真：人物の立体演出 {result.photoEffects.parallax}枚 ／ 光のゆらぎ {result.photoEffects.light}枚 ／ 静止 {result.photoEffects.still}枚</p>
             )}
             <button className="primary" onClick={share}>
               共有して写真に保存
@@ -542,11 +543,11 @@ function App() {
         </div>
       </section>
       <footer>
-        <p>基本編集版 · 写真全体のズーム・PANに対応</p>
+        <p>基本編集版 · 控えめな写真アニメーションに対応</p>
         <p>
           無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
-          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真全体に小さなズーム・PANを付け、黒帯が出ないよう縦横比を保って拡大・トリミングします。動画は冒頭最大4秒です。
+          1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真は人物の立体演出、または光のゆらぎを自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
         </p>
         <small>AI Travel Movie — Made for your memories.</small>
         <a href="./licenses/NOTICE.txt" className="license-link">

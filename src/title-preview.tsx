@@ -12,9 +12,8 @@ export function TitlePreview({ file, title, size }: { file: File; title: PhotoTi
     const { width, height } = outputSizes[size];
     image.decode().then(async () => {
       if (disposed) return;
-      const photo = await preparePhoto(image, width, height);
+      const photo = await preparePhoto(image, width, height, { animate: false });
       if (!disposed && canvas.current) {
-        photo.motion = "zoom-in";
         const ctx = canvas.current.getContext("2d")!;
         drawPhoto(ctx, photo, 0);
         drawPhotoTitle(ctx, title);
