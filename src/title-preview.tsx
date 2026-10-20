@@ -12,7 +12,7 @@ export function TitlePreview({ file, title, size }: { file: File; title: PhotoTi
     const { width, height } = outputSizes[size];
     image.decode().then(async () => {
       if (disposed) return;
-      const photo = await preparePhoto(image, width, height, { animate: false });
+      const photo = await preparePhoto(image, width, height, { index: 0 });
       if (!disposed && canvas.current) {
         const ctx = canvas.current.getContext("2d")!;
         drawPhoto(ctx, photo, 0);
