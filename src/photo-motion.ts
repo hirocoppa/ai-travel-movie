@@ -140,8 +140,10 @@ export async function preparePhoto(image: HTMLImageElement, outputWidth = 1280, 
   const base = document.createElement("canvas");
   const strength = options.strength ?? "small";
   const settings = motionSettings(strength, outputWidth, outputHeight);
-  const insetX = options.animate === false ? 0 : settings.borderX;
-  const insetY = options.animate === false ? 0 : settings.borderY;
+  // Reserve enough pixels for visible movement even when no person is detected.
+  const fallbackTravel = Math.round(outputWidth * (strength === "large" ? 0.065 : strength === "medium" ? 0.045 : 0.03));
+  const insetX = options.animate === false ? 0 : Math.max(settings.borderX, Math.ceil(fallbackTravel / 2) + 2);
+  const insetY = options.animate === false ? 0 : Math.max(settings.borderY, Math.ceil(fallbackTravel * 0.2) + 2);
   base.width = outputWidth + insetX * 2; base.height = outputHeight + insetY * 2;
   const frame = photoFrame(image.naturalWidth, image.naturalHeight, base.width, base.height);
   base.getContext("2d")!.drawImage(image, frame.x, frame.y, frame.width, frame.height);
@@ -174,12 +176,18 @@ export function drawPhoto(ctx: CanvasRenderingContext2D, layers: PhotoLayers, pr
     ctx.drawImage(layers.image, -layers.insetX + phase * backgroundX, -layers.insetY + phase * backgroundY);
     ctx.drawImage(layers.foreground, -layers.insetX - phase * foregroundX, -layers.insetY);
   } else {
-    ctx.drawImage(layers.image, -layers.insetX, -layers.insetY);
+    // Always animate non-person photos visibly; the previous exposure-only
+    // fallback was effectively imperceptible in one-second cuts.
+    const travel = width * (layers.strength === "large" ? 0.065 : layers.strength === "medium" ? 0.045 : 0.03);
+    const phase = eased - 0.5;
+    const offsetX = layers.effect === "light" ? phase * travel : 0;
+    const offsetY = layers.effect === "light" ? Math.sin(p * Math.PI) * travel * 0.08 : 0;
+    ctx.drawImage(layers.image, -layers.insetX + offsetX, -layers.insetY + offsetY);
     if (layers.effect === "light" && layers.light) {
       // A soft exposure change anchored to the image. No moving light stripe,
       // local deformation, or semantic water/cloud recognition.
       ctx.globalAlpha *= settings.lightAlpha * Math.sin(p * Math.PI) ** 2;
-      ctx.drawImage(layers.light, -layers.insetX, -layers.insetY, layers.image.width, layers.image.height);
+      ctx.drawImage(layers.light, -layers.insetX + offsetX, -layers.insetY + offsetY, layers.image.width, layers.image.height);
     }
   }
   ctx.restore();
