@@ -1,6 +1,6 @@
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { drawPhotoTitle, type PhotoTitle } from "./title";
-import { mixBgm, chooseMusicMood, newMusicSeed, type MusicMood, type AudioRegion } from "./music";
+import { mixRecordedBgm, loadMusic, type MusicMood, type AudioRegion } from "./music";
 import {
   preparePhoto,
   drawPhoto,
@@ -85,10 +85,14 @@ export async function exportMovie(
   const unsupported = await checkSupport(size);
   if (unsupported) throw new Error(unsupported);
   let musicMood: MusicMood = "bright";
-  const musicSeed = newMusicSeed();
+  let recording: AudioBuffer | undefined;
   if (bgm) {
-    onProgress(0, "写真の色合いからBGMの雰囲気を選んでいます");
-    musicMood = await chooseMusicMood(cuts.filter((c) => c.asset.kind === "photo").map((c) => c.asset.file), signal);
+    onProgress(0, "ライセンス確認済みのBGMを読み込んでいます");
+    const moods: MusicMood[] = ["calm", "bright", "warm"];
+    const choice = new Uint32Array(1);
+    crypto.getRandomValues(choice);
+    musicMood = moods[choice[0] % moods.length];
+    recording = (await loadMusic(musicMood, signal)).audio;
     onMusicMood?.(musicMood);
   }
   const canvas = document.createElement("canvas");
@@ -273,7 +277,7 @@ export async function exportMovie(
         cancelled(signal);
         const rendered = await offline.startRendering();
         cancelled(signal);
-        if (bgm) mixBgm(rendered, elapsed, total, originalAudio, musicMood, musicSeed);
+        if (bgm && recording) mixRecordedBgm(rendered, elapsed, total, originalAudio, recording);
         await audio.add(rendered);
         await audioDrain;
         if (audioError) throw audioError;
