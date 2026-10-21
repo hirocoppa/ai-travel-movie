@@ -68,6 +68,7 @@ export interface ExportOptions {
   size?: OutputSize;
   title?: PhotoTitle;
   bgm?: boolean;
+  customMusic?: File;
   onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
   onProgress: (fraction: number, message: string) => void;
@@ -79,7 +80,7 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, size = defaultOutputSize, title }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, customMusic, size = defaultOutputSize, title }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport(size);
@@ -88,12 +89,28 @@ export async function exportMovie(
   let recording: AudioBuffer | undefined;
   if (bgm) {
     onProgress(0, "ライセンス確認済みのBGMを読み込んでいます");
+    if (customMusic) {
+      onProgress(0, "選択した音楽ファイルを読み込んでいます");
+      const bytes = await customMusic.arrayBuffer();
+      cancelled(signal);
+      const context = new AudioContext();
+      try {
+        recording = await context.decodeAudioData(bytes);
+      } catch {
+        throw new Error("選択した音楽を再生できません。MP3・M4A・WAVなど対応形式のファイルを選んでください。");
+      } finally {
+        await context.close();
+      }
+      cancelled(signal);
+      if (!recording.duration) throw new Error("音楽ファイルに音声がありません。");
+    } else {
     const moods: MusicMood[] = ["calm", "bright", "warm"];
     const choice = new Uint32Array(1);
     crypto.getRandomValues(choice);
     musicMood = moods[choice[0] % moods.length];
     recording = (await loadMusic(musicMood, signal)).audio;
     onMusicMood?.(musicMood);
+    }
   }
   const canvas = document.createElement("canvas");
   const { width, height, bitrate } = outputSizes[size];
