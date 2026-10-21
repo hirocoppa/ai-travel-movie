@@ -1,116 +1,75 @@
-// Original procedural instrumental, synthesized locally. No recordings or model downloads.
+// CC0 recorded music from https://github.com/uncle-sheepsky/duru-ai-cc0-bgm
+// Original creator: DURU-AI. License: CC0 1.0 Universal.
+// Unlike the previous synthesized melody, these are finished audio recordings.
 export type MusicMood = "calm" | "bright" | "warm";
-export const moodLabels: Record<MusicMood, string> = { calm: "明るく爽やか", bright: "明るく軽快", warm: "明るくあたたか" };
-export function moodFromPixels(pixels: Uint8ClampedArray): MusicMood {
-  let light = 0, blueGreen = 0, warmth = 0, count = 0;
-  for (let i = 0; i < pixels.length; i += 4) {
-    if (pixels[i + 3] < 128) continue;
-    const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-    light += (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
-    blueGreen += Math.max(g, b) - r;
-    warmth += r - b;
-    count++;
-  }
-  if (!count) return "bright";
-  if (warmth / count > 25) return "warm";
-  if (blueGreen / count > 15 || light / count < 0.42) return "calm";
-  return "bright";
-}
-export async function chooseMusicMood(files: File[], signal: AbortSignal): Promise<MusicMood> {
-  const votes: Record<MusicMood, number> = { bright: 0, calm: 0, warm: 0 };
-  for (const file of files) {
-    signal.throwIfAborted();
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    try {
-      image.src = url;
-      await image.decode();
-      signal.throwIfAborted();
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = 32;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-      ctx.drawImage(image, 0, 0, 32, 32);
-      votes[moodFromPixels(ctx.getImageData(0, 0, 32, 32).data)]++;
-      canvas.width = 0;
-    } finally { image.src = ""; URL.revokeObjectURL(url); }
-  }
-  return (Object.keys(votes) as MusicMood[]).sort((a, b) => votes[b] - votes[a])[0];
-}
-const chords = [
-  [48, 52, 55, 60], // C major
-  [43, 47, 50, 55], // G
-  [41, 45, 48, 53], // F major
-  [48, 52, 55, 57], // C6
-];
-const melody = [72, 76, 79, 76, 74, 71, 67, 71, 72, 76, 81, 79, 77, 76, 72, 69];
-const frequency = (note: number) => 440 * 2 ** ((note - 69) / 12);
-const tone = (note: number, t: number) => Math.sin(2 * Math.PI * frequency(note) * t);
-export const musicTempo = (mood: MusicMood) => mood === "bright" ? 112 : mood === "warm" ? 104 : 108;
-// A fresh seed is generated once per export; the same seed is used for every audio chunk.
-export function newMusicSeed(): number {
-  const bytes = new Uint32Array(1);
-  crypto.getRandomValues(bytes);
-  return bytes[0];
-}
-function musicVariation(seed: number) {
-  const shift = seed % 5 - 2;
-  const rotation = (seed >>> 4) % melody.length;
-  const chordRotation = (seed >>> 9) % chords.length;
-  const tempoOffset = ((seed >>> 13) % 5 - 2) * 3;
-  const pluckMix = 0.8 + ((seed >>> 17) % 5) * 0.1;
-  return { shift, rotation, chordRotation, tempoOffset, pluckMix };
-}
-function chordAt(t: number, beat: number, rotation = 0) {
-  return chords[(Math.floor(Math.max(0, t) / (beat * 4)) + rotation) % chords.length];
-}
-export function musicSample(t: number, mood: MusicMood = "bright", seed = 0): number {
-  // Major harmony and a lively rhythm in every mood; tempo never changes pitch.
-  const variation = musicVariation(seed);
-  const beat = 60 / (musicTempo(mood) + variation.tempoOffset);
-  const bar = beat * 4;
-  const local = t % bar;
-  const current = chordAt(t, beat, variation.chordRotation);
-  const previous = chordAt(Math.max(0, t - bar), beat, variation.chordRotation);
-  const blend = Math.min(1, local / 0.18);
-  let pad = 0;
-  for (let i = 0; i < 4; i++)
-    pad += ((1 - blend) * tone(previous[i], t) + blend * tone(current[i], t)) * 0.045;
-  const step = Math.floor(t / beat);
-  const noteTime = t % beat;
-  // Soft bell/pluck, with an attack to avoid clicks at note boundaries.
-  const envelope = Math.min(1, noteTime / 0.012) * Math.exp(-noteTime * 5);
-  const note = melody[(step + variation.rotation) % melody.length] + variation.shift;
-  const pluck = (tone(note, noteTime) + 0.18 * tone(note + 12, noteTime)) * envelope * 0.24 * variation.pluckMix;
-  const eighth = beat / 2;
-  const arpeggioTime = t % eighth;
-  const arpeggioNote = current[Math.floor(t / eighth) % current.length] + 12;
-  const arpeggio = tone(arpeggioNote, arpeggioTime) * Math.min(1, arpeggioTime / 0.008) * Math.exp(-arpeggioTime * 12) * 0.13;
-  const pulse = tone(current[0], noteTime) * Math.min(1, noteTime / 0.01) * Math.exp(-noteTime * 9) * 0.1;
-  return pad + pluck + arpeggio + pulse;
-}
+export const moodLabels: Record<MusicMood, string> = {
+  calm: "Lo-fi / Chill", bright: "Electronic / Pop", warm: "Groove / Warm",
+};
 export type AudioRegion = { start: number; end: number };
-export function mixBgm(
+const source = "https://cdn.jsdelivr.net/gh/uncle-sheepsky/duru-ai-cc0-bgm@main/mp3/";
+const tracks: Record<MusicMood, string[]> = {
+  calm: ["duru-roomscene-lofi", "duru-rondo", "duru-ai-ep2-music"],
+  bright: ["duru-rondo", "duru-ai-ep2-music", "hyak-ep6-galaxy"],
+  warm: ["duru-roomscene-lofi", "duru-ai-ep2-music", "duru-rondo"],
+};
+let previousTrack = "";
+export async function loadMusic(mood: MusicMood, signal: AbortSignal): Promise<{ audio: AudioBuffer; title: string }> {
+  const pool = tracks[mood];
+  const candidates = pool.filter((name) => name !== previousTrack);
+  const random = new Uint32Array(1);
+  crypto.getRandomValues(random);
+  const title = candidates[random[0] % candidates.length];
+  const url = source + title + ".mp3";
+  let response: Response;
+  try {
+    response = await fetch(url, { signal });
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const bytes = await response.arrayBuffer();
+    if (signal.aborted) throw new DOMException("作成を中止しました。", "AbortError");
+    const context = new AudioContext();
+    try {
+      const audio = await context.decodeAudioData(bytes);
+      if (!audio.duration || !audio.numberOfChannels) throw new Error("Empty audio");
+      previousTrack = title;
+      return { audio, title };
+    } finally {
+      await context.close();
+    }
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new Error("BGMを取得できませんでした。通信環境を確認して再度お試しください。");
+  }
+}
+export function mixRecordedBgm(
   buffer: AudioBuffer,
   start: number,
   total: number,
   originalAudio: AudioRegion[],
-  mood: MusicMood = "bright",
-  seed = 0,
+  recording: AudioBuffer,
 ) {
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
+  const musicChannels = Array.from({ length: recording.numberOfChannels }, (_, i) => recording.getChannelData(i));
   const nearby = originalAudio.filter((r) => r.end + 0.2 >= start && r.start - 0.2 <= start + buffer.duration);
+  const loopLength = recording.duration;
+  const crossfade = Math.min(0.25, loopLength / 10);
   for (let i = 0; i < buffer.length; i++) {
     const t = start + i / buffer.sampleRate;
     const fade = Math.max(0, Math.min(1, t / 0.5, (total - t) / Math.min(1.5, total / 2)));
-    // Lower music around video sound, with smooth transitions across cut boundaries.
     let duck = 0;
     for (const region of nearby)
       duck = Math.max(duck, Math.max(0, Math.min(1, (t - region.start + 0.2) / 0.2, (region.end + 0.2 - t) / 0.2)));
-    const music = musicSample(t, mood, seed) * 0.9 * (1 - 0.7 * duck) * fade;
-    for (const channel of channels) {
-      const mixed = channel[i] * 0.8 + music;
-      // Smoothly limit only peaks; normal-level original sound remains linear.
-      channel[i] = Math.abs(mixed) <= 0.9 ? mixed : Math.sign(mixed) * (0.9 + 0.1 * Math.tanh((Math.abs(mixed) - 0.9) / 0.1));
+    const pos = t % loopLength;
+    for (let ch = 0; ch < channels.length; ch++) {
+      const samples = musicChannels[Math.min(ch, musicChannels.length - 1)];
+      const index = Math.min(samples.length - 1, Math.floor(pos * recording.sampleRate));
+      let sample = samples[index];
+      if (pos >= loopLength - crossfade) {
+        const blend = (pos - (loopLength - crossfade)) / crossfade;
+        const beginning = Math.min(samples.length - 1, Math.floor((pos - (loopLength - crossfade)) * recording.sampleRate));
+        sample = sample * (1 - blend) + samples[beginning] * blend;
+      }
+      const mixed = channels[ch][i] * 0.8 + sample * 0.65 * (1 - 0.7 * duck) * fade;
+      channels[ch][i] = Math.abs(mixed) <= 0.9 ? mixed : Math.sign(mixed) * (0.9 + 0.1 * Math.tanh((Math.abs(mixed) - 0.9) / 0.1));
     }
   }
 }
