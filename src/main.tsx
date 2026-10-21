@@ -33,6 +33,8 @@ function App() {
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1.5);
+  const [musicMode, setMusicMode] = useState<"auto" | "custom">("auto");
+  const [customMusic, setCustomMusic] = useState<File | null>(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -121,7 +123,7 @@ function App() {
     );
   }
   async function create() {
-    if (active.current || !orderConfirmed || !titleReady || unresolved.length || !plan.length)
+    if (active.current || !orderConfirmed || !titleReady || unresolved.length || !plan.length || (musicMode === "custom" && !customMusic))
       return;
     active.current = true;
     controller.current = new AbortController();
@@ -147,6 +149,7 @@ function App() {
       const blob = await exportMovie(plan, {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
+        customMusic: musicMode === "custom" ? customMusic ?? undefined : undefined,
         size,
         title,
         onPhotoMotion: (effect) => { photoEffects[effect]++; },
@@ -283,7 +286,23 @@ function App() {
         </label>
         <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。写真の表示時間全体でPAN・ZOOMを行います。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
         <p className="hint">写真ごとに異なるPAN・ZOOMを自動で組み合わせます。移動方向・拡大縮小・速度を変え、単調な繰り返しを避けます。写真は端末から送信しません。</p>
-        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>CC0ライセンスの録音済み楽曲から毎回自動選曲します。初回の動画作成時は音楽データの通信が必要です。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
+        <label className="photo-duration">
+          BGMの選び方
+          <select value={musicMode} disabled={busy || loading} onChange={(e) => { setMusicMode(e.target.value as "auto" | "custom"); setResult(null); }}>
+            <option value="auto">自動選曲（おすすめ・初期設定）</option>
+            <option value="custom">自分の音楽を選ぶ</option>
+          </select>
+        </label>
+        {musicMode === "custom" && (
+          <div className="intro-settings">
+            <label>音楽ファイル（MP3・M4A・WAVなど）
+              <input type="file" accept="audio/*,.mp3,.m4a,.wav,.aac" disabled={busy || loading} onChange={(e) => { setCustomMusic(e.target.files?.[0] ?? null); setResult(null); }} />
+            </label>
+            <p className="hint">{customMusic ? `選択中：${customMusic.name}` : "iPhoneの「ファイル」から音楽を選択してください。"}</p>
+            <p className="hint">利用権限のある音楽ファイルを選んでください。Apple MusicやSpotifyの保護された配信曲は直接読み込めません。音楽ファイルはサーバーにアップロードしません。</p>
+          </div>
+        )}
+        <p className="hint"><strong>初期設定は自動選曲です。</strong>CC0楽曲から毎回選曲します（通信が必要）。自分の音楽を選んだ場合はその曲を使います。元動画の音声は残し、再生中はBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -442,6 +461,7 @@ function App() {
             !orderConfirmed ||
             !titleReady ||
             !plan.length ||
+            (musicMode === "custom" && !customMusic) ||
             support !== null
           }
         >
@@ -475,7 +495,7 @@ function App() {
             <span className="eyebrow">YOUR MOVIE IS READY</span>
             <h2>旅の映画ができました。</h2>
             <video src={result.url} controls playsInline />
-            <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（CC0楽曲から自動選曲）` : "なし"}</p>
+            <p>BGM：{musicMode === "custom" ? customMusic?.name ?? "選択した音楽" : result.musicMood ? `${moodLabels[result.musicMood]}（CC0楽曲から自動選曲）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {Object.values(result.photoEffects).some((count) => count > 0) && (
               <p>写真：自動PAN・ZOOM {result.photoEffects.light}枚</p>
