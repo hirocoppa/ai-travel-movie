@@ -283,7 +283,7 @@ function App() {
         </label>
         <p className="hint">1枚目の写真は3秒、2枚目以降は選んだ秒数を共通で使います。写真の表示時間全体でPAN・ZOOMを行います。縦横比を保って画面いっぱいに拡大するため、写真の上下・左右の一部が切り取られます。</p>
         <p className="hint">写真ごとに異なるPAN・ZOOMを自動で組み合わせます。移動方向・拡大縮小・速度を変え、単調な繰り返しを避けます。写真は端末から送信しません。</p>
-        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>明るいメジャー調のBGMを基本に、写真の色合いからテンポや音色を選んで端末内で生成します。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
+        <p className="hint"><strong>BGMは自動で付きます（無料）。</strong>CC0ライセンスの録音済み楽曲から毎回自動選曲します。初回の動画作成時は音楽データの通信が必要です。動画の元音声も残し、その区間ではBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -475,7 +475,7 @@ function App() {
             <span className="eyebrow">YOUR MOVIE IS READY</span>
             <h2>旅の映画ができました。</h2>
             <video src={result.url} controls playsInline />
-            <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（写真の色合いから自動選択）` : "なし"}</p>
+            <p>BGM：{result.musicMood ? `${moodLabels[result.musicMood]}（CC0楽曲から自動選曲）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {Object.values(result.photoEffects).some((count) => count > 0) && (
               <p>写真：自動PAN・ZOOM {result.photoEffects.light}枚</p>
@@ -538,7 +538,7 @@ function App() {
       <footer>
         <p>基本編集版 · 写真ごとの自動PAN・ZOOMに対応</p>
         <p>
-          無料の自動BGMに対応。AI選別・見どころ抽出・AI音楽生成は未実装です。
+          無料のCC0録音済みBGMを自動選曲します（通信が必要）。AI選別・見どころ抽出・AI音楽生成は未実装です。
           <br />
           1枚目の写真は3秒、2枚目以降は1秒・1.5秒・2秒から選べます。写真には異なる方向・速度のPAN・ZOOMを自動適用します。縦横比を保って拡大・トリミングし、黒帯を防ぎます。動画は冒頭最大4秒です。
         </p>
