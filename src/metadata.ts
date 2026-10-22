@@ -107,7 +107,7 @@ export async function inspectFile(file: File): Promise<Asset> {
         );
         Object.assign(asset, parsed, photoTitleMetadata(tags));
         asset.dateSource =
-          parsed.date !== null ? "EXIF 撮影日時" : "EXIF・時差の確認が必要";
+          parsed.date !== null ? "EXIF 撮影日時" : "EXIF 撮影日時（時差情報なし）";
       }
       const url = URL.createObjectURL(file);
       const image = new Image();
@@ -155,7 +155,7 @@ export async function inspectFile(file: File): Promise<Asset> {
           throw new Error("動画の長さを取得できません。");
         asset.date = await quickTimeDate(file);
         asset.dateSource =
-          asset.date === null ? "撮影日時なし" : "QuickTime 撮影日時（要確認）";
+          asset.date === null ? "撮影日時なし" : "QuickTime 撮影日時";
       } finally {
         input.dispose();
       }
