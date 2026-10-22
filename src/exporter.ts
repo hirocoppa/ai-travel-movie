@@ -207,7 +207,7 @@ export async function exportMovie(
           ? new CanvasSink(track, {
               width,
               height,
-              fit: "contain",
+              fit: "cover",
               poolSize: 2,
             })
           : null;
