@@ -27,7 +27,6 @@ function App() {
   const [size, setSize] = useState<OutputSize>(defaultOutputSize);
   const [orientation, setOrientation] = useState<OutputOrientation>("landscape");
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
-  const [confirmedTitle, setConfirmedTitle] = useState("");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1.5);
   const [musicMode, setMusicMode] = useState<"auto" | "library" | "custom">("auto");
   const [customMusic, setCustomMusic] = useState<File | null>(null);
@@ -51,8 +50,7 @@ function App() {
     [result],
   );
   const valid = assets.filter((a) => !a.error);
-  const unresolved: Asset[] = [];
-  let plan: ReturnType<typeof makePlan> = [];
+    let plan: ReturnType<typeof makePlan> = [];
   try {
     plan = makePlan(assets, photoDuration);
   } catch {}
@@ -61,12 +59,9 @@ function App() {
     date: titleEdits[firstPhoto.id]?.date ?? firstPhoto.titleDate ?? (firstPhoto.date !== null ? new Date(firstPhoto.date).toLocaleDateString("sv-SE") : ""),
     place: titleEdits[firstPhoto.id]?.place ?? firstPhoto.location ?? "",
   } : { date: "", place: "" };
-  const titleKey = JSON.stringify([firstPhoto?.id, title.date, title.place]);
-  const titleReady = !firstPhoto || confirmedTitle === titleKey;
   function editTitle(field: keyof PhotoTitle, value: string) {
     if (!firstPhoto) return;
     setTitleEdits((old) => ({ ...old, [firstPhoto.id]: { ...old[firstPhoto.id], [field]: value } }));
-    setConfirmedTitle("");
     setResult(null);
   }
   const length = totalDuration(plan);
@@ -101,7 +96,7 @@ function App() {
     }
   }
   async function create() {
-    if (active.current || !titleReady || unresolved.length || !plan.length || (musicMode === "custom" && !customMusic))
+    if (active.current || !plan.length || (musicMode === "custom" && !customMusic))
       return;
     active.current = true;
     controller.current = new AbortController();
@@ -372,7 +367,7 @@ function App() {
         )}
         {firstPhoto && (
           <section className="intro-settings">
-            <h2>1枚目の写真の日付・場所を確認</h2>
+            <h2>1枚目の写真に表示する日付・場所</h2>
             <p className="hint">{firstPhoto.file.name} を3秒表示し、最初の2秒だけ左下に文字を入れます。撮影順で最初の写真が対象です。</p>
             <label>表示する日付
               <input value={title.date} maxLength={80} disabled={busy || loading} onChange={(e) => editTitle("date", e.target.value)} />
@@ -386,11 +381,6 @@ function App() {
               <p>{title.date || "（日付なし）"}</p>
               <p>{title.place || "（場所なし）"}</p>
             </div>
-            <label className="confirmation">
-              <input type="checkbox" checked={titleReady} disabled={busy || loading} onChange={(e) => setConfirmedTitle(e.target.checked ? titleKey : "")} />
-              表示する日付と場所を確認しました
-            </label>
-            {!titleReady && <p className="confirmation-alert">日付と場所を確認・修正し、確認チェックを入れてください。</p>}
           </section>
         )}
         {support && (
@@ -404,7 +394,6 @@ function App() {
           disabled={
             busy ||
             loading ||
-            !titleReady ||
             !plan.length ||
             (musicMode === "custom" && !customMusic) ||
             support !== null
@@ -476,7 +465,7 @@ function App() {
           <span>◷</span>
           <h3>思い出の順番を大切に</h3>
           <p>
-            撮影日時を確認して、
+            撮影日時を自動取得して、
             <br />
             旅の始まりから終わりまで。
           </p>
