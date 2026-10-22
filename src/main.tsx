@@ -1,7 +1,7 @@
 import type { PhotoEffect } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import type { PhotoTitle } from "./title";
-import { moodLabels, type MusicMood } from "./music";
+import { moodLabels, musicLibrary, musicTrackUrl, type LibraryTrackId, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { inspectFile } from "./metadata";
@@ -32,8 +32,9 @@ function App() {
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1.5);
-  const [musicMode, setMusicMode] = useState<"auto" | "custom">("auto");
+  const [musicMode, setMusicMode] = useState<"auto" | "library" | "custom">("auto");
   const [customMusic, setCustomMusic] = useState<File | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<LibraryTrackId>(musicLibrary[0].id);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -149,6 +150,7 @@ function App() {
         onMusicMood: (mood) => { musicMood = mood; },
         bgm: true,
         customMusic: musicMode === "custom" ? customMusic ?? undefined : undefined,
+        selectedTrack: musicMode === "library" ? selectedTrack : undefined,
         size,
         title,
         onPhotoMotion: (effect) => { photoEffects[effect]++; },
@@ -287,11 +289,23 @@ function App() {
         <p className="hint">写真ごとに異なるPAN・ZOOMを自動で組み合わせます。移動方向・拡大縮小・速度を変え、単調な繰り返しを避けます。写真は端末から送信しません。</p>
         <label className="photo-duration">
           BGMの選び方
-          <select value={musicMode} disabled={busy || loading} onChange={(e) => { setMusicMode(e.target.value as "auto" | "custom"); setResult(null); }}>
+          <select value={musicMode} disabled={busy || loading} onChange={(e) => { setMusicMode(e.target.value as "auto" | "library" | "custom"); setResult(null); }}>
             <option value="auto">自動選曲（おすすめ・初期設定）</option>
+            <option value="library">曲を試聴して選ぶ</option>
             <option value="custom">自分の音楽を選ぶ</option>
           </select>
         </label>
+        {musicMode === "library" && (
+          <div className="intro-settings">
+            <label>使用するBGM
+              <select value={selectedTrack} disabled={busy || loading} onChange={(e) => { setSelectedTrack(e.target.value as LibraryTrackId); setResult(null); }}>
+                {musicLibrary.map((track) => <option key={track.id} value={track.id}>{track.label}（{moodLabels[track.mood]}）</option>)}
+              </select>
+            </label>
+            <p className="hint">下のプレーヤーで曲を試聴できます。選んだ曲が動画に使われます。</p>
+            <audio key={selectedTrack} controls preload="none" src={musicTrackUrl(selectedTrack)} style={{ width: "100%" }} />
+          </div>
+        )}
         {musicMode === "custom" && (
           <div className="intro-settings">
             <label>音楽ファイル（MP3・M4A・WAVなど）
@@ -301,7 +315,7 @@ function App() {
             <p className="hint">利用権限のある音楽ファイルを選んでください。Apple MusicやSpotifyの保護された配信曲は直接読み込めません。音楽ファイルはサーバーにアップロードしません。</p>
           </div>
         )}
-        <p className="hint"><strong>初期設定は自動選曲です。</strong>CC0楽曲から毎回選曲します（通信が必要）。自分の音楽を選んだ場合はその曲を使います。元動画の音声は残し、再生中はBGMを控えめにします。</p>
+        <p className="hint"><strong>初期設定は自動選曲です。</strong>CC0楽曲から毎回選曲します（通信が必要）。一覧から曲を選ぶか、自分の音楽を指定することもできます。元動画の音声は残し、再生中はBGMを控えめにします。</p>
         {loading && <p role="status">{status}</p>}
         {assets.length > 0 && (
           <div className="timeline">
@@ -498,7 +512,7 @@ function App() {
             <span className="eyebrow">YOUR MOVIE IS READY</span>
             <h2>旅の映画ができました。</h2>
             <video src={result.url} controls playsInline />
-            <p>BGM：{musicMode === "custom" ? customMusic?.name ?? "選択した音楽" : result.musicMood ? `${moodLabels[result.musicMood]}（CC0楽曲から自動選曲）` : "なし"}</p>
+            <p>BGM：{musicMode === "custom" ? customMusic?.name ?? "選択した音楽" : musicMode === "library" ? musicLibrary.find((track) => track.id === selectedTrack)?.label : result.musicMood ? `${moodLabels[result.musicMood]}（CC0楽曲から自動選曲）` : "なし"}</p>
             <p>{(result.blob.size / 1000000).toFixed(1)} MB · MP4</p>
             {Object.values(result.photoEffects).some((count) => count > 0) && (
               <p>写真：自動PAN・ZOOM {result.photoEffects.light}枚</p>
