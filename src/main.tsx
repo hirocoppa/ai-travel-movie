@@ -10,10 +10,6 @@ import { checkSupport, exportMovie } from "./exporter";
 import "./style.css";
 const time = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(Number.isInteger(seconds) ? 0 : 1).padStart(Number.isInteger(seconds) ? 2 : 4, "0")}`;
-const inputDate = (n: number) =>
-  new Date(n - new Date(n).getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 19);
 function App() {
   const [assets, setAssets] = useState<Asset[]>([]),
     [loading, setLoading] = useState(false),
@@ -62,7 +58,7 @@ function App() {
   } catch {}
   const firstPhoto = plan.find((cut) => cut.asset.kind === "photo")?.asset;
   const title: PhotoTitle = firstPhoto ? {
-    date: titleEdits[firstPhoto.id]?.date ?? firstPhoto.titleDate ?? (firstPhoto.date !== null ? inputDate(firstPhoto.date).slice(0, 10) : ""),
+    date: titleEdits[firstPhoto.id]?.date ?? firstPhoto.titleDate ?? (firstPhoto.date !== null ? new Date(firstPhoto.date).toLocaleDateString("sv-SE") : ""),
     place: titleEdits[firstPhoto.id]?.place ?? firstPhoto.location ?? "",
   } : { date: "", place: "" };
   const titleKey = JSON.stringify([firstPhoto?.id, title.date, title.place]);
@@ -103,22 +99,6 @@ function App() {
       setStatus("");
       if (fileInput.current) fileInput.current.value = "";
     }
-  }
-  function changeDate(id: string, value: string) {
-    setResult(null);
-    setAssets((old) =>
-      old.map((a) =>
-        a.id === id
-          ? {
-              ...a,
-              date: value ? new Date(value).getTime() : null,
-              confirmed: !!value,
-              titleDate: value.slice(0, 10),
-              dateSource: "手動指定（この端末の時差）",
-            }
-          : a,
-      ),
-    );
   }
   async function create() {
     if (active.current || !titleReady || unresolved.length || !plan.length || (musicMode === "custom" && !customMusic))
@@ -333,15 +313,10 @@ function App() {
             <div className="section-head">
               <span className="step">02</span>
               <div>
-                <h2>撮影日時と順番</h2>
+                <h2>素材の並び順</h2>
                 <p>撮影日時がある素材は古い順に並べます。日時がない素材は最後に選択順で並べます。</p>
               </div>
             </div>
-            <p className="hint">
-              撮影日時は自動で読み込みます。必要な場合だけ修正できます。入力欄はこの端末の時差（
-              {Intl.DateTimeFormat().resolvedOptions().timeZone}
-              ）で表示します。
-            </p>
             {sorted.map((a) => (
               <article
                 className={`asset ${a.error ? "invalid" : ""}`}
@@ -366,21 +341,7 @@ function App() {
                           : `動画 · ${time(a.duration)} → 冒頭${Math.min(4, a.duration).toFixed(1)}秒`}{" "}
                         · {a.dateSource}
                       </small>
-                      <label>
-                        撮影日時
-                        <input
-                          aria-label={`${a.file.name}の撮影日時`}
-                          type="datetime-local"
-                          step="1"
-                          disabled={busy || loading}
-                          value={
-                            a.date !== null
-                              ? inputDate(a.date)
-                              : (a.localDate ?? "")
-                          }
-                          onChange={(e) => changeDate(a.id, e.target.value)}
-                        />
-                      </label>
+
                     </>
                   )}
                 </div>
