@@ -39,11 +39,9 @@ export function parseCaptureDate(
 }
 export type PhotoDuration = 1 | 1.5 | 2;
 export function makePlan(assets: Asset[], photoDuration: PhotoDuration = 1): Cut[] {
-  if (assets.some((a) => !a.error && (a.date === null || !a.confirmed)))
-    throw new Error("撮影日時と順序を確認してください。");
   const sorted = assets
     .filter((a) => !a.error)
-    .sort((a, b) => a.date! - b.date!);
+    .sort((a, b) => (a.date ?? Infinity) - (b.date ?? Infinity));
   const firstPhoto = sorted.find((asset) => asset.kind === "photo");
   const candidates: Cut[] = sorted.map((asset) => ({
     asset,
@@ -52,7 +50,7 @@ export function makePlan(assets: Asset[], photoDuration: PhotoDuration = 1): Cut
       asset.kind === "photo"
         ? asset === firstPhoto ? 3 : photoDuration
         : Math.min(4, Math.floor(asset.duration * 30) / 30),
-    capturedAt: asset.date!,
+    capturedAt: asset.date ?? Number.MAX_SAFE_INTEGER,
   }));
   const available = candidates.reduce((n, c) => n + c.duration, 0);
   if (available <= 180) return candidates;
