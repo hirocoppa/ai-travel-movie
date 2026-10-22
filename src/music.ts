@@ -7,10 +7,24 @@ export const moodLabels: Record<MusicMood, string> = {
 };
 export type AudioRegion = { start: number; end: number };
 const source = "https://cdn.jsdelivr.net/gh/uncle-sheepsky/duru-ai-cc0-bgm@main/mp3/";
+// All 17 CC0 tracks published in the unified DURU-AI pack.
+// Every track appears in at least one mood pool, so auto-selection can reach all 17.
 const tracks: Record<MusicMood, string[]> = {
-  calm: ["duru-roomscene-lofi", "duru-rondo", "duru-ai-ep2-music"],
-  bright: ["duru-rondo", "duru-ai-ep2-music", "hyak-ep6-galaxy"],
-  warm: ["duru-roomscene-lofi", "duru-ai-ep2-music", "duru-rondo"],
+  calm: [
+    "duru-roomscene-lofi", "duru-rondo", "duru-ai-ep2-music",
+    "hyak-ep6-galaxy", "hyak-ep4-blackhole",
+  ],
+  bright: [
+    "duru-rondo", "duru-arcade-vibe", "duru-rhythm-fever",
+    "duru-denparcade", "duru-winter-arcade", "hyak-ep1-rhythm",
+    "hyak-ep3-suika", "hyak-ep7-danmaku",
+    "korobeiniki-arcade-fullver",
+  ],
+  warm: [
+    "duru-roomscene-lofi", "duru-ai-ep2-music",
+    "hyak-ep5-2048", "hyak-ep2-korobeiniki-tetris",
+    "korobeiniki-boombap-loop", "mountainking-arcade-loop",
+  ],
 };
 let previousTrack = "";
 export async function loadMusic(mood: MusicMood, signal: AbortSignal): Promise<{ audio: AudioBuffer; title: string }> {
