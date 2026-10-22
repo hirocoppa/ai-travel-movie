@@ -79,10 +79,10 @@ describe("timeline", () => {
     const plan = makePlan([a(1, "video", 2.51)]);
     expect(totalDuration(plan)).toBe(2.5);
   });
-  it("blocks unknown dates instead of assuming import order", () =>
-    expect(() => makePlan([{ ...a(1), date: null }])).toThrow());
-  it("blocks unconfirmed video dates", () =>
-    expect(() => makePlan([{ ...a(1), confirmed: false }])).toThrow());
+  it("allows files without capture dates and places them after dated media", () =>
+    expect(makePlan([{ ...a(1), date: null }, a(2)]).map((cut) => cut.asset.id)).toEqual(["2", "1"]));
+  it("does not block media that have not been manually confirmed", () =>
+    expect(makePlan([{ ...a(1), confirmed: false }])).toHaveLength(1));
   it("excludes unsupported files", () =>
     expect(
       makePlan([{ ...a(1), error: "unsupported" }, a(2)]).map(
