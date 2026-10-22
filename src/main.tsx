@@ -1,6 +1,5 @@
 import type { PhotoEffect } from "./photo-motion";
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
-import { TitlePreview } from "./title-preview";
 import type { PhotoTitle } from "./title";
 import { moodLabels, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
@@ -439,7 +438,11 @@ function App() {
               <input value={title.place} maxLength={120} disabled={busy || loading} onChange={(e) => editTitle("place", e.target.value)} placeholder="場所を入力" />
             </label>
             <p className="hint">日付・地名は写真のメタデータから取得します。GPSのみの場合は緯度・経度を表示します。地名への変換は行いません。情報がない項目は入力でき、空欄の項目は表示しません。</p>
-            <TitlePreview file={firstPhoto.file} title={title} size={size} />
+            <div className="title-text-preview" role="status" aria-label="日付と場所の文字プレビュー">
+              <strong>動画に表示する文字</strong>
+              <p>{title.date || "（日付なし）"}</p>
+              <p>{title.place || "（場所なし）"}</p>
+            </div>
             <label className="confirmation">
               <input type="checkbox" checked={titleReady} disabled={busy || loading} onChange={(e) => setConfirmedTitle(e.target.checked ? titleKey : "")} />
               表示する日付と場所を確認しました
