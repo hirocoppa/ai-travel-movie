@@ -17,7 +17,7 @@ describe("automatic photo camera moves", () => {
   });
   it("varies direction and zoom between photos but stays deterministic", () => {
     const moves = Array.from({ length: 30 }, (_, i) => cameraMove(i));
-    expect(new Set(moves.map(m => m.kind)).size).toBeGreaterThan(4);
+    expect(new Set(moves.map(m => m.kind))).toEqual(new Set([0, 1, 2, 3]));
     expect(new Set(moves.map(m => m.toZoom - m.fromZoom > 0)).size).toBe(2);
     expect(moves[7]).toEqual(cameraMove(7));
     for (const m of moves) {
