@@ -175,7 +175,7 @@ function App() {
         <a href="#">
           ✦ <b>AI Travel Movie</b>
         </a>
-        <span className="local">● 端末内で編集</span>
+        <span className="local">● 端末内で編集 · 更新版 10/22</span>
       </nav>
       <header>
         <span className="eyebrow">YOUR JOURNEY, BEAUTIFULLY TOGETHER</span>
