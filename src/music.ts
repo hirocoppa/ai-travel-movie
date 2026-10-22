@@ -7,32 +7,32 @@ export const moodLabels: Record<MusicMood, string> = {
 };
 export type AudioRegion = { start: number; end: number };
 const source = "https://cdn.jsdelivr.net/gh/uncle-sheepsky/duru-ai-cc0-bgm@main/mp3/";
-// All 17 CC0 tracks published in the unified DURU-AI pack.
-// Every track appears in at least one mood pool, so auto-selection can reach all 17.
-const tracks: Record<MusicMood, string[]> = {
-  calm: [
-    "duru-roomscene-lofi", "duru-rondo", "duru-ai-ep2-music",
-    "hyak-ep6-galaxy", "hyak-ep4-blackhole",
-  ],
-  bright: [
-    "duru-rondo", "duru-arcade-vibe", "duru-rhythm-fever",
-    "duru-denparcade", "duru-winter-arcade", "hyak-ep1-rhythm",
-    "hyak-ep3-suika", "hyak-ep7-danmaku",
-    "korobeiniki-arcade-fullver",
-  ],
-  warm: [
-    "duru-roomscene-lofi", "duru-ai-ep2-music",
-    "hyak-ep5-2048", "hyak-ep2-korobeiniki-tetris",
-    "korobeiniki-boombap-loop", "mountainking-arcade-loop",
-  ],
+// Travel-friendly shortlist. Arcade/game-like tracks are deliberately excluded.
+// Users can preview each track before selecting it for their movie.
+export const musicLibrary = [
+  { id: "duru-roomscene-lofi", label: "Roomscene Lo-fi", mood: "calm" },
+  { id: "duru-rondo", label: "Rondo", mood: "calm" },
+  { id: "duru-ai-ep2-music", label: "Gentle Journey", mood: "warm" },
+  { id: "hyak-ep6-galaxy", label: "Galaxy", mood: "calm" },
+  { id: "hyak-ep4-blackhole", label: "Blackhole", mood: "calm" },
+  { id: "korobeiniki-boombap-loop", label: "Boombap Loop", mood: "warm" },
+] as const satisfies ReadonlyArray<{ id: string; label: string; mood: MusicMood }>;
+export type LibraryTrackId = (typeof musicLibrary)[number]["id"];
+export function musicTrackUrl(id: LibraryTrackId): string {
+  return source + id + ".mp3";
+}
+const tracks: Record<MusicMood, LibraryTrackId[]> = {
+  calm: musicLibrary.filter(t => t.mood === "calm").map(t => t.id),
+  bright: ["duru-rondo", "korobeiniki-boombap-loop"],
+  warm: musicLibrary.filter(t => t.mood === "warm").map(t => t.id),
 };
 let previousTrack = "";
-export async function loadMusic(mood: MusicMood, signal: AbortSignal): Promise<{ audio: AudioBuffer; title: string }> {
+export async function loadMusic(mood: MusicMood, signal: AbortSignal, selectedTrack?: LibraryTrackId): Promise<{ audio: AudioBuffer; title: string }> {
   const pool = tracks[mood];
   const candidates = pool.filter((name) => name !== previousTrack);
   const random = new Uint32Array(1);
   crypto.getRandomValues(random);
-  const title = candidates[random[0] % candidates.length];
+  const title = selectedTrack ?? candidates[random[0] % candidates.length];
   const url = source + title + ".mp3";
   let response: Response;
   try {
