@@ -1,5 +1,5 @@
 import type { PhotoEffect } from "./photo-motion";
-import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
+import { outputSizes, defaultOutputSize, defaultPortraitSize, sizesForOrientation, type OutputSize, type OutputOrientation } from "./output-settings";
 import type { PhotoTitle } from "./title";
 import { moodLabels, musicLibrary, musicTrackUrl, type LibraryTrackId, type MusicMood } from "./music";
 import React, { useEffect, useRef, useState } from "react";
@@ -29,6 +29,7 @@ function App() {
     photoEffects: Record<PhotoEffect, number>;
   } | null>(null);
   const [size, setSize] = useState<OutputSize>(defaultOutputSize);
+  const [orientation, setOrientation] = useState<OutputOrientation>("landscape");
   const [titleEdits, setTitleEdits] = useState<Record<string, Partial<PhotoTitle>>>({});
   const [confirmedTitle, setConfirmedTitle] = useState("");
   const [photoDuration, setPhotoDuration] = useState<PhotoDuration>(1.5);
@@ -265,11 +266,24 @@ function App() {
           </div>
         </div>
         <label className="photo-duration">
-          出力サイズ
-          <select value={size} disabled={busy || loading} onChange={(e) => { setSize(e.target.value as OutputSize); setResult(null); }}>
-            {Object.keys(outputSizes).map((value) => <option key={value} value={value}>{value.replace("x", " × ")}</option>)}
+          出力タイプ
+          <select value={orientation} disabled={busy || loading} onChange={(e) => {
+            const next = e.target.value as OutputOrientation;
+            setOrientation(next);
+            setSize(next === "portrait" ? defaultPortraitSize : defaultOutputSize);
+            setResult(null);
+          }}>
+            <option value="landscape">横型（16:9）</option>
+            <option value="portrait">縦型（9:16）</option>
           </select>
         </label>
+        <label className="photo-duration">
+          {orientation === "portrait" ? "縦型の解像度" : "横型の解像度"}
+          <select value={size} disabled={busy || loading} onChange={(e) => { setSize(e.target.value as OutputSize); setResult(null); }}>
+            {sizesForOrientation(orientation).map((value) => <option key={value} value={value}>{value.replace("x", " × ")}</option>)}
+          </select>
+        </label>
+        <p className="hint">写真と動画は{orientation === "portrait" ? "縦型9:16" : "横型16:9"}の画面いっぱいに表示するよう、縦横比を保って中央基準でトリミングします。元の素材は変更しません。</p>
         <label className="photo-duration">
           写真の表示時間（全体共通）
           <select
