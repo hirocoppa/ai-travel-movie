@@ -160,7 +160,7 @@ export async function inspectFile(file: File): Promise<Asset> {
         input.dispose();
       }
     }
-    asset.confirmed = asset.date !== null && asset.kind === "photo";
+    asset.confirmed = true;
   } catch (e) {
     asset.error = e instanceof Error ? e.message : "読み込みに失敗しました。";
   }
