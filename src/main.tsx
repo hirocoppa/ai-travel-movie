@@ -56,10 +56,10 @@ function App() {
     [result],
   );
   const valid = assets.filter((a) => !a.error);
-  const unresolved = valid.filter((a) => a.date === null || !a.confirmed);
+  const unresolved: Asset[] = [];
   let plan: ReturnType<typeof makePlan> = [];
   try {
-    if (!unresolved.length) plan = makePlan(assets, photoDuration);
+    plan = makePlan(assets, photoDuration);
   } catch {}
   const firstPhoto = plan.find((cut) => cut.asset.kind === "photo")?.asset;
   const title: PhotoTitle = firstPhoto ? {
@@ -336,18 +336,18 @@ function App() {
             <div className="section-head">
               <span className="step">02</span>
               <div>
-                <h2>撮影日時と順番を確認</h2>
-                <p>古い順に編集します。ファイル名・更新日時は使いません。</p>
+                <h2>撮影日時と順番</h2>
+                <p>撮影日時がある素材は古い順に並べます。日時がない素材は最後に選択順で並べます。</p>
               </div>
             </div>
             <p className="hint">
-              時差のないEXIFは、撮影地の時差に直して日時を指定してください。入力欄はこの端末の時差（
+              撮影日時は自動で読み込みます。必要な場合だけ修正できます。入力欄はこの端末の時差（
               {Intl.DateTimeFormat().resolvedOptions().timeZone}
-              ）で表示します。QuickTimeの日時は保存日時の場合があるため確認が必要です。
+              ）で表示します。
             </p>
             {sorted.map((a) => (
               <article
-                className={`asset ${a.error ? "invalid" : a.date === null || !a.confirmed ? "needs-confirmation" : ""}`}
+                className={`asset ${a.error ? "invalid" : ""}`}
                 key={a.id}
               >
                 {a.thumbnail ? (
@@ -359,9 +359,6 @@ function App() {
                 )}
                 <div className="asset-info">
                   <strong>{a.file.name}</strong>
-                  {!a.error && (a.date === null || !a.confirmed) && (
-                    <p className="confirmation-alert">要確認：この素材の撮影日時を入力・確認してください</p>
-                  )}
                   {a.error ? (
                     <p role="alert">{a.error}</p>
                   ) : (
@@ -387,30 +384,6 @@ function App() {
                           onChange={(e) => changeDate(a.id, e.target.value)}
                         />
                       </label>
-                      {!a.confirmed && (
-                        <button
-                          className="text-button confirmation-action"
-                          disabled={busy || loading}
-                          onClick={() => {
-                            if (a.date !== null) {
-                              setAssets((old) =>
-                                old.map((x) =>
-                                  x.id === a.id ? { ...x, confirmed: true } : x,
-                                ),
-                              );
-                              setOrderConfirmed(false);
-                            } else if (a.localDate) {
-                              changeDate(a.id, a.localDate);
-                            }
-                          }}
-                        >
-                          {a.date !== null
-                            ? "この日時を確認"
-                            : a.localDate
-                              ? "表示日時をこの端末の時差として確定"
-                              : "日時を入力してください"}
-                        </button>
-                      )}
                     </>
                   )}
                 </div>
@@ -428,13 +401,7 @@ function App() {
                 </button>
               </article>
             ))}
-            {unresolved.length > 0 && (
-              <p className="notice confirmation-alert" role="alert">
-                {unresolved.length}
-                件の撮影日時が未確認です。赤い「要確認」の素材を確認してください。
-              </p>
-            )}
-            {valid.length > 0 && unresolved.length === 0 && (
+            {valid.length > 0 && (
               <>
                 <label className="confirmation">
                   <input
