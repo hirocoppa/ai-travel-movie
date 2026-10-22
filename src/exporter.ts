@@ -1,6 +1,6 @@
 import { outputSizes, defaultOutputSize, type OutputSize } from "./output-settings";
 import { drawPhotoTitle, type PhotoTitle } from "./title";
-import { mixRecordedBgm, loadMusic, type MusicMood, type AudioRegion } from "./music";
+import { mixRecordedBgm, loadMusic, type MusicMood, type LibraryTrackId, type AudioRegion } from "./music";
 import {
   preparePhoto,
   drawPhoto,
@@ -69,6 +69,7 @@ export interface ExportOptions {
   title?: PhotoTitle;
   bgm?: boolean;
   customMusic?: File;
+  selectedTrack?: LibraryTrackId;
   onMusicMood?: (mood: MusicMood) => void;
   signal: AbortSignal;
   onProgress: (fraction: number, message: string) => void;
@@ -80,7 +81,7 @@ function cancelled(signal: AbortSignal) {
 }
 export async function exportMovie(
   cuts: Cut[],
-  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, customMusic, size = defaultOutputSize, title }: ExportOptions,
+  { signal, onProgress, onPhotoMotion, onMusicMood, bgm = true, customMusic, selectedTrack, size = defaultOutputSize, title }: ExportOptions,
 ): Promise<Blob> {
   if (!cuts.length) throw new Error("使用できる素材がありません。");
   const unsupported = await checkSupport(size);
@@ -108,7 +109,7 @@ export async function exportMovie(
     const choice = new Uint32Array(1);
     crypto.getRandomValues(choice);
     musicMood = moods[choice[0] % moods.length];
-    recording = (await loadMusic(musicMood, signal)).audio;
+    recording = (await loadMusic(musicMood, signal, selectedTrack)).audio;
     onMusicMood?.(musicMood);
     }
   }
