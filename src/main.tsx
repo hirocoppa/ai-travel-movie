@@ -36,7 +36,6 @@ function App() {
   const [musicMode, setMusicMode] = useState<"auto" | "library" | "custom">("auto");
   const [customMusic, setCustomMusic] = useState<File | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<LibraryTrackId>(musicLibrary[0].id);
-  const [orderConfirmed, setOrderConfirmed] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const active = useRef(false);
@@ -88,7 +87,6 @@ function App() {
     active.current = true;
     setLoading(true);
     setError("");
-    setOrderConfirmed(false);
     setResult(null);
     const incoming: Asset[] = [];
     try {
@@ -108,7 +106,6 @@ function App() {
   }
   function changeDate(id: string, value: string) {
     setResult(null);
-    setOrderConfirmed(false);
     setAssets((old) =>
       old.map((a) =>
         a.id === id
@@ -124,7 +121,7 @@ function App() {
     );
   }
   async function create() {
-    if (active.current || !orderConfirmed || !titleReady || unresolved.length || !plan.length || (musicMode === "custom" && !customMusic))
+    if (active.current || !titleReady || unresolved.length || !plan.length || (musicMode === "custom" && !customMusic))
       return;
     active.current = true;
     controller.current = new AbortController();
@@ -393,8 +390,7 @@ function App() {
                   disabled={busy || loading}
                   onClick={() => {
                     setAssets((old) => old.filter((x) => x.id !== a.id));
-                    setOrderConfirmed(false);
-                    setResult(null);
+                                    setResult(null);
                   }}
                 >
                   ×
@@ -403,15 +399,6 @@ function App() {
             ))}
             {valid.length > 0 && (
               <>
-                <label className="confirmation">
-                  <input
-                    type="checkbox"
-                    checked={orderConfirmed}
-                    disabled={busy || loading}
-                    onChange={(e) => setOrderConfirmed(e.target.checked)}
-                  />
-                  表示された撮影順で編集する
-                </label>
                 <p className="hint">
                   使用予定 {plan.length}素材 · {time(length)}
                   {length < 180
@@ -456,7 +443,6 @@ function App() {
           disabled={
             busy ||
             loading ||
-            !orderConfirmed ||
             !titleReady ||
             !plan.length ||
             (musicMode === "custom" && !customMusic) ||
